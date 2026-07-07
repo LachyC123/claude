@@ -308,6 +308,73 @@ HC.sprites = (function () {
   S.gravekeeper = [fromMap(gkMap(0, false)), fromMap(gkMap(1, false))];
   S.gravekeeperUp = fromMap(gkMap(0, true));
 
+  // ---------- Bell Cultist (12x15, 2 frames) ----------
+  var bcTop = [
+    '...0000.....',
+    '..0KKKK0....',
+    '..0KEKE0....',
+    '..0KKKK0....',
+    '...0KK0...0.',
+    '..0KKKK0.0Y0',
+    '.0KKRRKK00b0',
+    '.0KKRRKK0.b0',
+    '.0K0KKK0..b0',
+    '..00KKK00.0.',
+    '...0KKK0....'
+  ];
+  S.cultist = [
+    fromMap(bcTop.concat([
+      '..0K0.0K0...',
+      '..0K0.0K0...',
+      '...0...0....',
+      '............'
+    ])),
+    fromMap(bcTop.concat([
+      '...0K00K0...',
+      '...0K00K0...',
+      '....0..0....',
+      '............'
+    ]))
+  ];
+
+  // ---------- Bram the carpenter (13x15) ----------
+  S.bram = fromMap([
+    '....0000.....',
+    '...0bFFb0....',
+    '...0FFFF0....',
+    '...0F0F00....',
+    '...0FFFF0....',
+    '..00bbbb00...',
+    '.0bBBBBBBb0..',
+    '.0bB0bb0Bb000',
+    '.0bBbbbbBb0S0',
+    '.0b0bbbb0b0S0',
+    '..00bbbb00.0.',
+    '...0B00B0....',
+    '...0B00B0....',
+    '....0..0.....',
+    '.............'
+  ]);
+
+  // ---------- Lysa the herbalist (12x15) ----------
+  S.lysa = fromMap([
+    '....0000....',
+    '...0gggg0...',
+    '..0gFFFFg0..',
+    '..0gF0F0g0..',
+    '..0gFFFFg0..',
+    '...0gggg0...',
+    '..0gGGGGg0..',
+    '.0gGGGGGGg0.',
+    '.0gG0GG0Gg0.',
+    '.0g0GGGG0g0.',
+    '..00GGGG0b0.',
+    '...0G00G0b0.',
+    '...0G00G00..',
+    '....0..0....',
+    '............'
+  ]);
+
   // ---------- Survivor: Brother Cole, wounded (14x12) ----------
   S.survivor = fromMap([
     '....0000......',
@@ -611,6 +678,133 @@ HC.sprites = (function () {
   S.chapelDark = S.chapel(false);
   S.chapelLit = S.chapel(true);
 
+  // ---------- burned village props ----------
+  S.burnedHouse = function (seed, w, h) {
+    w = w || 64; h = h || 44;
+    var rng = HC.srng(seed * 3571 + 41);
+    return make(w, h, function (g) {
+      var wallTop = 8 + Math.floor(rng() * 4);
+      // jagged charred shell
+      g.fillStyle = PAL['0'];
+      var heights = [];
+      var cols = Math.ceil(w / 4);
+      for (var i = 0; i < cols; i++) heights.push(wallTop + Math.floor(rng() * 9) - 4);
+      for (var x = 0; x < w; x++) {
+        var top = Math.max(2, heights[Math.floor(x / 4)]);
+        g.fillRect(x, top, 1, h - top - 1);
+      }
+      // inner charcoal
+      g.fillStyle = '#191c28';
+      for (var x2 = 2; x2 < w - 2; x2++) {
+        var top2 = Math.max(2, heights[Math.floor(x2 / 4)]) + 2;
+        g.fillRect(x2, top2, 1, h - top2 - 3);
+      }
+      // door hole
+      var dx = Math.floor(w * 0.35 + rng() * w * 0.25);
+      g.fillStyle = '#05060d';
+      g.fillRect(dx, h - 22, 12, 21);
+      g.fillStyle = PAL['0'];
+      g.fillRect(dx - 1, h - 23, 1, 22); g.fillRect(dx + 12, h - 23, 1, 22);
+      // window holes
+      var wx = dx > w / 2 ? 8 : w - 20;
+      g.fillStyle = '#05060d';
+      g.fillRect(wx, h - 26, 9, 9);
+      // fallen beams
+      g.fillStyle = '#241d16';
+      g.fillRect(4, h - 6, Math.floor(w * 0.3), 2);
+      g.fillRect(w - 18, h - 9, 14, 2);
+      // smoldering cracks
+      for (var e = 0; e < 14; e++) {
+        var ex = 3 + Math.floor(rng() * (w - 6));
+        var ey = h - 4 - Math.floor(rng() * 16);
+        g.fillStyle = rng() < 0.5 ? '#93262e' : '#f2a13c';
+        g.fillRect(ex, ey, 1, 1);
+      }
+      // ash dust on top edges
+      g.fillStyle = '#3a3f4d';
+      for (var a = 0; a < cols; a++) {
+        if (rng() < 0.5) g.fillRect(a * 4, Math.max(2, heights[a]) - 1, 3, 1);
+      }
+    });
+  };
+
+  S.well = make(18, 16, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(2, 7, 14, 8);
+    g.fillStyle = PAL.M; g.fillRect(3, 8, 12, 6);
+    g.fillStyle = PAL.H; g.fillRect(3, 8, 12, 1);
+    g.fillStyle = '#05060d'; g.fillRect(5, 9, 8, 4);
+    g.fillStyle = PAL['0']; g.fillRect(3, 1, 2, 7); g.fillRect(13, 1, 2, 7);
+    g.fillStyle = PAL.B; g.fillRect(4, 2, 1, 6); g.fillRect(13, 2, 1, 6);
+    g.fillStyle = PAL['0']; g.fillRect(3, 0, 12, 2);
+    g.fillStyle = PAL.D; g.fillRect(4, 0, 10, 1);
+  });
+
+  S.cart = make(22, 13, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(2, 2, 16, 7);
+    g.fillStyle = PAL.B; g.fillRect(3, 3, 14, 5);
+    g.fillStyle = PAL.b; g.fillRect(3, 3, 14, 1);
+    g.fillStyle = PAL.K; g.fillRect(6, 4, 8, 3);
+    g.fillStyle = PAL['0'];
+    g.fillRect(4, 8, 4, 4); g.fillRect(5, 12, 2, 1);
+    g.fillStyle = PAL.D; g.fillRect(5, 9, 2, 2);
+    g.fillStyle = PAL['0']; g.fillRect(17, 8, 3, 3);
+  });
+
+  S.cellarDoors = make(16, 13, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(1, 1, 14, 11);
+    g.fillStyle = PAL.B; g.fillRect(2, 2, 6, 9); g.fillRect(8, 2, 6, 9);
+    g.fillStyle = PAL.b; g.fillRect(2, 2, 6, 1); g.fillRect(8, 2, 6, 1);
+    g.fillStyle = PAL['0']; g.fillRect(7, 1, 1, 11);
+    g.fillStyle = PAL.s; g.fillRect(4, 6, 2, 2); g.fillRect(10, 6, 2, 2);
+  });
+
+  S.signpost = make(12, 18, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(5, 2, 2, 15);
+    g.fillStyle = PAL.B; g.fillRect(5, 3, 1, 13);
+    g.fillStyle = PAL['0']; g.fillRect(0, 3, 11, 6);
+    g.fillStyle = PAL.b; g.fillRect(1, 4, 9, 4);
+    g.fillStyle = PAL.D; g.fillRect(2, 5, 6, 1); g.fillRect(2, 7, 4, 1);
+    g.fillStyle = PAL['0']; g.fillRect(0, 4, 1, 4);
+  });
+
+  S.oilCask = make(11, 12, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(1, 2, 9, 9);
+    g.fillStyle = PAL.B; g.fillRect(2, 3, 7, 7);
+    g.fillStyle = PAL.b; g.fillRect(3, 3, 2, 7);
+    g.fillStyle = PAL.s; g.fillRect(2, 4, 7, 1); g.fillRect(2, 8, 7, 1);
+    g.fillStyle = PAL.W; g.fillRect(4, 5, 3, 2);
+    g.fillStyle = PAL.o; g.fillRect(5, 6, 1, 1);
+  });
+
+  S.smolder = make(14, 9, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(2, 5, 10, 3);
+    g.fillStyle = '#241d16'; g.fillRect(3, 6, 8, 2);
+    g.fillStyle = '#93262e'; g.fillRect(4, 5, 2, 2); g.fillRect(8, 6, 2, 1);
+    g.fillStyle = '#f2a13c'; g.fillRect(5, 4, 1, 2); g.fillRect(9, 5, 1, 1);
+    g.fillStyle = '#ffd47a'; g.fillRect(5, 5, 1, 1);
+  });
+
+  S.tent = make(20, 15, function (g) {
+    g.fillStyle = PAL['0'];
+    for (var i = 0; i < 8; i++) g.fillRect(2 + i, 12 - i, 16 - i * 2, 1);
+    g.fillRect(1, 12, 18, 2);
+    g.fillStyle = '#4a4436';
+    for (var j = 1; j < 7; j++) g.fillRect(4 + j, 12 - j, 12 - j * 2, 1);
+    g.fillStyle = '#5c543f'; g.fillRect(6, 9, 3, 1); g.fillRect(8, 11, 4, 1);
+    g.fillStyle = '#05060d'; g.fillRect(8, 8, 4, 5);
+    g.fillStyle = PAL['0']; g.fillRect(9, 4, 1, 2);
+  });
+
+  S.herbTable = make(16, 12, function (g) {
+    g.fillStyle = PAL['0']; g.fillRect(1, 4, 14, 5);
+    g.fillStyle = PAL.b; g.fillRect(2, 5, 12, 3);
+    g.fillStyle = PAL.B; g.fillRect(2, 7, 12, 1);
+    g.fillStyle = PAL['0']; g.fillRect(2, 9, 2, 3); g.fillRect(12, 9, 2, 3);
+    g.fillStyle = PAL.g; g.fillRect(3, 3, 3, 2); g.fillRect(8, 3, 2, 2);
+    g.fillStyle = PAL.G; g.fillRect(4, 4, 2, 1); g.fillRect(11, 4, 2, 1);
+    g.fillStyle = PAL.W; g.fillRect(12, 3, 2, 2);
+  });
+
   // ---------- tiles ----------
   function tile(fn, seed) {
     var rng = HC.srng(seed || 1);
@@ -659,6 +853,29 @@ HC.sprites = (function () {
         { color: '#3a2e1d', density: 0.04 }
       ], rng);
     }, 400 + mi));
+  }
+  T.ash = [];
+  for (var ai = 0; ai < 3; ai++) {
+    T.ash.push(tile(function (g, rng) {
+      speckle(g, 16, 16, '#272a30', [
+        { color: '#2f333a', density: 0.13 },
+        { color: '#1e2126', density: 0.14 },
+        { color: '#3a3f47', density: 0.04 },
+        { color: '#15171c', density: 0.03 }
+      ], rng);
+    }, 700 + ai));
+  }
+  T.charfloor = [];
+  for (var ci = 0; ci < 3; ci++) {
+    T.charfloor.push(tile(function (g, rng) {
+      speckle(g, 16, 16, '#1d1f27', [
+        { color: '#24262f', density: 0.12 },
+        { color: '#15161d', density: 0.15 },
+        { color: '#31343e', density: 0.03 }
+      ], rng);
+      if (rng() < 0.16) { g.fillStyle = '#93262e'; g.fillRect(Math.floor(rng() * 15), Math.floor(rng() * 15), 1, 1); }
+      if (rng() < 0.1) { g.fillStyle = '#f2a13c'; g.fillRect(Math.floor(rng() * 15), Math.floor(rng() * 15), 1, 1); }
+    }, 800 + ci));
   }
   T.stonefloor = [];
   for (var si = 0; si < 3; si++) {

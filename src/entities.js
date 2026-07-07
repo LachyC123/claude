@@ -14,6 +14,10 @@ HC.ENEMY_DEFS = {
   archer: {
     name: 'Corpse Archer', hp: 30, spd: 30, dmg: 12, r: 5, aggro: 140, souls: 18,
     windup: 0.65, recover: 1.6, ranged: true, keepMin: 70, keepMax: 120
+  },
+  cultist: {
+    name: 'Bell Cultist', hp: 28, spd: 24, dmg: 12, r: 5, aggro: 135, souls: 20,
+    windup: 0.85, recover: 1.9, ranged: true, keepMin: 60, keepMax: 110, bolt: true
   }
 };
 
@@ -40,6 +44,13 @@ HC.makePlayer = function (x, y) {
   P.dmgMult = function () { return Math.pow(1.16, HC.run.stats.str); };
   P.hp = P.maxHp();
   P.st = P.maxSt();
+  // hub rescue perks: Lysa improves ember flasks, Bram reinforces the Ash Guard
+  var perks = HC.game.flags || {};
+  P.maxFlasks = perks.lysaSaved ? 4 : 3;
+  P.flasks = P.maxFlasks;
+  P.flaskHeal = perks.lysaSaved ? 60 : 45;
+  P.guardDur = perks.bramSaved ? 1.1 : 0.8;
+  P.guardFactor = perks.bramSaved ? 0.15 : 0.25;
 
   P.update = function (dt) {
     if (P.dead) return;
@@ -61,7 +72,7 @@ HC.makePlayer = function (x, y) {
       P.guard -= dt;
       if (P.guard <= 0) P.guardCd = 2.2;
     } else if (inp.hit('guard') && !busy && P.guardCd <= 0 && P.st >= 15 && P.hasSword) {
-      P.guard = 0.8;
+      P.guard = P.guardDur;
       P.st -= 15; P.stDelay = 0.4;
       HC.audio.sfx.guard();
       HC.particles.burst(P.x, P.y, 10, { color: '#9aa3b2', spMin: 20, spMax: 50, lifeMax: 0.4 });
@@ -91,9 +102,9 @@ HC.makePlayer = function (x, y) {
       P.drink -= dt;
       HC.world.moveEnt(P, mx * 22 * dt, my * 22 * dt);
       if (P.drink <= 0) {
-        P.hp = Math.min(P.maxHp(), P.hp + 45);
+        P.hp = Math.min(P.maxHp(), P.hp + P.flaskHeal);
         HC.audio.sfx.heal();
-        HC.floaters.add(P.x, P.y - 14, '+45', '#7fe08a');
+        HC.floaters.add(P.x, P.y - 14, '+' + P.flaskHeal, '#7fe08a');
         HC.particles.burst(P.x, P.y, 14, { color: '#ffd47a', spMin: 10, spMax: 40, lifeMax: 0.7, glow: 1 });
       }
     } else {
@@ -171,7 +182,7 @@ HC.makePlayer = function (x, y) {
   P.hurt = function (dmg, sx, sy) {
     if (P.dead || P.iframes > 0) return false;
     var guarded = P.guard > 0;
-    var final = Math.round(guarded ? dmg * 0.25 : dmg);
+    var final = Math.round(guarded ? dmg * P.guardFactor : dmg);
     P.hp -= final;
     P.flash = 0.15;
     P.iframes = 0.75;
@@ -373,8 +384,13 @@ HC.makeEnemy = function (type, x, y, zone) {
           if (def.ranged) {
             E.state = 'recover';
             var aa = HC.angTo(E.x, E.y, p.x, p.y);
-            HC.audio.sfx.arrow();
-            HC.game.addEnt(HC.makeArrow(E.x, E.y - 6, Math.cos(aa) * 145, Math.sin(aa) * 145, def.dmg));
+            if (def.bolt) {
+              HC.audio.sfx.bell();
+              HC.game.addEnt(HC.makeSoulBolt(E.x, E.y - 6, aa, def.dmg));
+            } else {
+              HC.audio.sfx.arrow();
+              HC.game.addEnt(HC.makeArrow(E.x, E.y - 6, Math.cos(aa) * 145, Math.sin(aa) * 145, def.dmg));
+            }
           } else {
             E.state = 'lunge';
             var la = HC.angTo(E.x, E.y, p.x, p.y);
@@ -400,7 +416,7 @@ HC.makeEnemy = function (type, x, y, zone) {
   E.base = function () { return E.y + 7; };
 
   E.draw = function (ctx, cx, cy) {
-    var frames = type === 'dog' ? (E.faceLeft ? HC.sprites.dogLeft : HC.sprites.dog) : HC.sprites[type === 'hollow' ? 'hollow' : 'archer'];
+    var frames = type === 'dog' ? (E.faceLeft ? HC.sprites.dogLeft : HC.sprites.dog) : HC.sprites[type];
     var img = frames[Math.floor(E.anim * 5) % 2];
     var px = Math.round(E.x - cx - img.width / 2);
     var py = Math.round(E.y - cy - img.height + 6);
@@ -640,6 +656,43 @@ HC.makeArrow = function (x, y, vx, vy, dmg) {
   return A;
 };
 
+// slow homing soul bolt fired by Bell Cultists — dodge through it or outrun it
+HC.makeSoulBolt = function (x, y, ang, dmg) {
+  var B = { kind: 'bolt', x: x, y: y, ang: ang, t: 0, alive: true };
+  B.update = function (dt) {
+    B.t += dt;
+    if (B.t > 3.6) { B.alive = false; return; }
+    var p = HC.game.player;
+    if (!p.dead && B.t < 2.6) {
+      var want = HC.angTo(B.x, B.y, p.x, p.y - 4);
+      var d = HC.angDiff(B.ang, want);
+      B.ang += HC.clamp(d, -1.7 * dt, 1.7 * dt);
+    }
+    var sp = 74;
+    B.x += Math.cos(B.ang) * sp * dt;
+    B.y += Math.sin(B.ang) * sp * dt;
+    if (HC.world.solidAt(B.x, B.y)) { B.alive = false; return; }
+    if (Math.random() < dt * 20)
+      HC.particles.spawn({ x: B.x, y: B.y, vx: HC.rand(-8, 8), vy: HC.rand(-8, 8), life: 0.35, color: '#8fe8ff', size: 1 });
+    if (!p.dead && p.iframes <= 0 && HC.dist(B.x, B.y, p.x, p.y - 4) < p.r + 3) {
+      p.hurt(dmg, B.x - Math.cos(B.ang) * 8, B.y - Math.sin(B.ang) * 8);
+      B.alive = false;
+    }
+  };
+  B.base = function () { return B.y + 300; };
+  B.draw = function (ctx, cx, cy) {
+    var px = Math.round(B.x - cx), py = Math.round(B.y - cy);
+    ctx.fillStyle = 'rgba(143,232,255,0.35)';
+    ctx.fillRect(px - 3, py - 3, 6, 6);
+    ctx.fillStyle = '#8fe8ff';
+    ctx.fillRect(px - 1, py - 1, 3, 3);
+    ctx.fillStyle = '#e8fbff';
+    ctx.fillRect(px, py, 1, 1);
+  };
+  B.lights = function () { return [{ x: B.x, y: B.y, r: 16, warm: 0 }]; };
+  return B;
+};
+
 HC.makeShockwave = function (x, y, dmg) {
   var S = { kind: 'shock', x: x, y: y, r: 8, hitDone: false, alive: true };
   S.update = function (dt) {
@@ -745,13 +798,28 @@ HC.makeInteractable = function (type, tx, ty) {
     kind: type, x: tx * HC.TILE + 8, y: ty * HC.TILE + 8,
     t: 0, alive: true, isInteract: true, used: false
   };
+  var F = HC.game.flags || {};
   if (type === 'sword') { I.prompt = 'TAKE THE BROKEN SWORD'; I.radius = 22; }
   if (type === 'brazier') {
-    I.prompt = (HC.game.flags && HC.game.flags.brazierLit) ? 'REST BY THE FLAME' : 'LIGHT THE CHAPEL FLAME';
+    I.prompt = F.brazierLit ? 'REST BY THE FLAME' : 'LIGHT THE CHAPEL FLAME';
+    if (F.brazierLit && F.hasOil && !F.q1Done) I.prompt = 'POUR THE HOLY OIL';
     I.radius = 26; I.solid = true;
   }
   if (type === 'shrine') { I.prompt = 'OFFER REMEMBRANCE'; I.radius = 26; I.solid = true; }
   if (type === 'survivor') { I.prompt = 'SPEAK'; I.radius = 22; }
+  if (type === 'oil') { I.prompt = 'TAKE THE HOLY OIL'; I.radius = 22; }
+  if (type === 'bramDoor') {
+    I.prompt = F.choiceMade ? (F.choiceMade === 'bram' ? 'BRAM' : 'THE HAMMERING HAS STOPPED') : 'ANSWER THE HAMMERING';
+    if (F.rescueDone && F.choiceMade === 'bram') I.prompt = 'EMPTY WORKSHOP';
+    I.radius = 24;
+  }
+  if (type === 'lysaDoor') {
+    I.prompt = F.choiceMade ? (F.choiceMade === 'lysa' ? 'LYSA' : 'THE CELLAR IS SILENT') : 'ANSWER THE VOICE BELOW';
+    if (F.rescueDone && F.choiceMade === 'lysa') I.prompt = 'EMPTY CELLAR';
+    I.radius = 24;
+  }
+  if (type === 'bram') { I.prompt = 'SPEAK'; I.radius = 22; }
+  if (type === 'lysa') { I.prompt = 'SPEAK'; I.radius = 22; }
 
   if (I.solid) {
     HC.world.props.push({ type: type + '-block', x: I.x - 6, y: I.y - 4, solid: { x: I.x - 6, y: I.y - 4, w: 12, h: 10 }, base: -1, img: null, draw: null });
@@ -769,18 +837,32 @@ HC.makeInteractable = function (type, tx, ty) {
       ctx.fillRect(px - 1, py - 6, 1, 1);
     } else if (type === 'brazier') {
       ctx.drawImage(HC.game.flags.brazierLit ? S.brazierLit : S.brazierUnlit, px - 8, py - 12);
-      if (HC.game.flags.brazierLit && Math.random() < 0.3)
+      if (HC.game.flags.brazierLit && Math.random() < (HC.game.flags.q1Done ? 0.65 : 0.3))
         HC.particles.spawn({ x: I.x + HC.rand(-3, 3), y: I.y - 8, vx: HC.rand(-5, 5), vy: HC.rand(-28, -12), life: 0.7, color: Math.random() < 0.5 ? '#f2a13c' : '#ffd47a', size: 1 });
     } else if (type === 'shrine') {
       ctx.drawImage(S.shrine, px - 8, py - 18);
     } else if (type === 'survivor') {
-      ctx.drawImage(S.survivor, px - 7, py - 9 + (Math.floor(I.t * 1.5) % 2 === 0 ? 0 : 0));
+      ctx.drawImage(S.survivor, px - 7, py - 9);
+    } else if (type === 'oil') {
+      ctx.drawImage(S.oilCask, px - 5, py - 8);
+      var oa = 0.25 + 0.2 * Math.sin(I.t * 3);
+      ctx.fillStyle = 'rgba(255,212,122,' + oa + ')';
+      ctx.fillRect(px - 1, py - 4, 2, 2);
+    } else if (type === 'bram') {
+      ctx.drawImage(S.bram, px - 6, py - 11);
+    } else if (type === 'lysa') {
+      ctx.drawImage(S.lysa, px - 6, py - 11);
     }
+    // bramDoor / lysaDoor draw nothing: the house and cellar props carry the visuals
   };
   I.lights = function () {
-    if (type === 'brazier' && HC.game.flags.brazierLit) return [{ x: I.x, y: I.y - 8, r: 85, warm: 1, flicker: 1 }];
+    if (type === 'brazier' && HC.game.flags.brazierLit) {
+      var big = HC.game.flags.q1Done;
+      return [{ x: I.x, y: I.y - 8, r: big ? 115 : 85, warm: 1, flicker: 1 }];
+    }
     if (type === 'shrine') return [{ x: I.x - 5, y: I.y - 4, r: 20, warm: 1, flicker: 1 }, { x: I.x + 4, y: I.y - 5, r: 20, warm: 1, flicker: 1 }];
     if (type === 'sword') return [{ x: I.x, y: I.y - 4, r: 18, warm: 0, flicker: 1 }];
+    if (type === 'oil') return [{ x: I.x, y: I.y - 4, r: 18, warm: 1, flicker: 1 }];
     return [];
   };
   return I;

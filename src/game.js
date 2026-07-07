@@ -25,12 +25,84 @@ HC.game = (function () {
     G.flags = {
       swordTaken: false, graveCleared: false, z0Cleared: false,
       bossDead: false, brazierLit: false, metCole: false,
-      shrineSeen: false, prologueDone: false
+      shrineSeen: false, sawIntro: false, sawPreBoss: false,
+      sawVillageEnter: false, sawVillageChoice: false,
+      q1Started: false, choiceMade: null, rescueDone: false,
+      bramSaved: false, lysaSaved: false, lostSeen: false,
+      hasOil: false, q1Done: false
     };
   }
 
+  // ---------- save / continue ----------
+  var SAVE_KEY = 'hollowcrown_save';
+  G.saveGame = function () {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        v: 1,
+        souls: HC.run.souls, stats: HC.run.stats, checkpoint: HC.run.checkpoint,
+        time: HC.run.time, deaths: HC.run.deaths, kills: HC.run.kills,
+        flags: G.flags
+      }));
+    } catch (e) { }
+  };
+  function hasSave() {
+    try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+  }
+  function loadSave() {
+    try {
+      var d = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (!d || d.v !== 1) return false;
+      newRun();
+      HC.run.souls = d.souls || 0;
+      HC.run.stats = d.stats || HC.run.stats;
+      HC.run.checkpoint = d.checkpoint || HC.run.checkpoint;
+      HC.run.time = d.time || 0;
+      HC.run.deaths = d.deaths || 0;
+      HC.run.kills = d.kills || 0;
+      for (var k in d.flags) G.flags[k] = d.flags[k];
+      return true;
+    } catch (e) { return false; }
+  }
+  function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } }
+
+  G.setCheckpoint = function (map, entry) {
+    HC.run.checkpoint = { map: map, entry: entry };
+    G.saveGame();
+  };
+
+  // debug: jump straight to a post-prologue chapel with the flame lit
+  G.debugToChapel = function () {
+    newRun();
+    HC.run.souls = 500;
+    var f = G.flags;
+    f.sawIntro = f.swordTaken = f.graveCleared = f.z0Cleared = true;
+    f.bossDead = f.sawPreBoss = f.metCole = f.brazierLit = f.shrineSeen = true;
+    HC.run.checkpoint = { map: 'chapel', entry: 'fromGraveyard' };
+    G.loadMap('chapel', 'fromGraveyard');
+    G.state = 'play';
+  };
+
+  // one source of truth for the objective tracker, derived from flags
+  G.refreshQuest = function () {
+    var F = G.flags;
+    if (F.q1Done) HC.quest.set('THE BELL TOWER AWAITS - GROW STRONG');
+    else if (F.q1Started) {
+      if (F.choiceMade && !F.rescueDone) HC.quest.set(F.choiceMade === 'bram' ? 'DEFEND THE WORKSHOP' : 'DEFEND THE CELLAR');
+      else if (F.hasOil) HC.quest.set('RETURN THE OIL TO THE CHAPEL FLAME');
+      else if (!F.choiceMade) HC.quest.set('SEARCH THE BURNED VILLAGE - ANSWER THE VOICES');
+      else HC.quest.set('FIND THE HOLY OIL IN THE VILLAGE STORE');
+    }
+    else if (F.brazierLit) HC.quest.set('SPEAK TO BROTHER COLE');
+    else if (F.metCole) HC.quest.set('LIGHT THE CHAPEL FLAME');
+    else if (F.bossDead || F.z0Cleared) HC.quest.set('REACH CANDLEFALL CHAPEL');
+    else if (F.graveCleared) HC.quest.set('FOLLOW THE GRAVEYARD PATH NORTH');
+    else if (F.swordTaken) HC.quest.set('CUT DOWN THE RISEN DEAD');
+    else if (F.sawIntro) HC.quest.set('FIND A WEAPON IN THE MASS GRAVE');
+  };
+
   // ---------- map loading ----------
   G.loadMap = function (mapId, entry) {
+    HC.dialogue.active = false; // a new map never carries the previous scene's conversation
     var def = HC.maps[mapId];
     var spawn = HC.world.load(def, entry);
     G.ents = [];
@@ -51,8 +123,24 @@ HC.game = (function () {
         G.ents.push(HC.makePickup(s.type, s.x, s.y));
       } else if (s.type === 'sword') {
         if (!G.flags.swordTaken) G.ents.push(HC.makeInteractable('sword', s.x, s.y));
+      } else if (s.type === 'oil') {
+        if (!G.flags.hasOil) G.ents.push(HC.makeInteractable('oil', s.x, s.y));
       } else {
         G.ents.push(HC.makeInteractable(s.type, s.x, s.y));
+      }
+    }
+
+    if (mapId === 'village' && G.flags.choiceMade && !G.flags.rescueDone) {
+      spawnRescueWave(G.flags.choiceMade, true);
+    }
+    if (mapId === 'chapel') {
+      if (G.flags.bramSaved) {
+        G.ents.push(HC.makeInteractable('bram', 10, 11));
+        HC.world.spawnProp('tent', 8, 10);
+      }
+      if (G.flags.lysaSaved) {
+        G.ents.push(HC.makeInteractable('lysa', 10, 11));
+        HC.world.spawnProp('herbtable', 8, 10);
       }
     }
 
@@ -64,10 +152,10 @@ HC.game = (function () {
 
     // gates re-apply persistent flags
     if (mapId === 'graveyard') {
-      if (G.flags.z0Cleared) HC.world.gates.a.open = true, HC.world.gates.a.anim = 1;
+      if (G.flags.z0Cleared) { HC.world.gates.A.open = true; HC.world.gates.A.anim = 1; }
       if (G.flags.bossDead) {
-        HC.world.gates.b.open = true; HC.world.gates.b.anim = 1;
-        HC.world.gates.d.open = true; HC.world.gates.d.anim = 1;
+        HC.world.gates.B.open = true; HC.world.gates.B.anim = 1;
+        HC.world.gates.D.open = true; HC.world.gates.D.anim = 1;
       }
       // triggers that already fired stay quiet
       markFired('intro', true);
@@ -82,6 +170,7 @@ HC.game = (function () {
     HC.audio.setMusic(G.flags.brazierLit && mapId === 'chapel' ? 'hub' : def.music);
     G.mapBannerT = 3;
     G.currentMap = mapId;
+    G.refreshQuest();
 
     function markFired(ev, onlyIfSeen) {
       for (var t = 0; t < HC.world.triggers.length; t++) {
@@ -99,49 +188,46 @@ HC.game = (function () {
     switch (name) {
       case 'intro':
         G.flags.sawIntro = true;
-        HC.dialogue.start('intro', function () {
-          HC.quest.set('FIND A WEAPON IN THE MASS GRAVE');
-        });
+        HC.dialogue.start('intro', function () { G.refreshQuest(); });
         break;
       case 'swordTaken':
         G.flags.swordTaken = true;
         G.player.hasSword = true;
         HC.audio.sfx.soul();
         HC.dialogue.start('swordTaken', function () {
-          HC.quest.set('CUT DOWN THE RISEN DEAD');
+          G.refreshQuest();
           HC.toast('J / X : ATTACK      SPACE : DODGE ROLL      L : ASH GUARD');
           spawnDelayed('swordTaken');
+          G.saveGame();
         });
         break;
       case 'graveCleared':
-        HC.dialogue.start('graveCleared', function () {
-          HC.quest.set('FOLLOW THE GRAVEYARD PATH NORTH');
-        });
+        HC.dialogue.start('graveCleared', function () { G.refreshQuest(); });
         break;
       case 'z0Cleared':
         G.flags.z0Cleared = true;
-        HC.world.setGate('a', true);
-        HC.run.checkpoint = { map: 'graveyard', entry: 'gateA' };
+        HC.world.setGate('A', true);
+        G.setCheckpoint('graveyard', 'gateA');
         HC.dialogue.start('zone0Cleared', function () {
-          HC.quest.set('REACH CANDLEFALL CHAPEL');
+          G.refreshQuest();
           HC.toast('CHECKPOINT - THE GATE STANDS OPEN');
         });
         break;
       case 'preBoss':
+        if (G.flags.sawPreBoss) break;
+        G.flags.sawPreBoss = true;
         HC.dialogue.start('preBoss');
         break;
       case 'bossStart':
         if (!G.boss || G.flags.bossDead) break;
-        HC.world.setGate('b', false);
+        HC.world.setGate('B', false);
         HC.dialogue.start('bossStart', function () {
           G.boss.activate();
           HC.audio.setMusic('boss');
         });
         break;
       case 'bossDead':
-        HC.dialogue.start('bossDead', function () {
-          HC.quest.set('REACH CANDLEFALL CHAPEL');
-        });
+        HC.dialogue.start('bossDead', function () { G.refreshQuest(); });
         break;
       case 'toChapel':
         G.pendingMap = { map: 'chapel', entry: 'fromGraveyard' };
@@ -159,14 +245,81 @@ HC.game = (function () {
         HC.world.setChapelLit();
         HC.audio.sfx.brazier();
         HC.audio.setMusic('hub');
-        HC.run.checkpoint = { map: 'chapel', entry: 'fromGraveyard' };
         HC.camera.shake(2, 0.3);
+        G.setCheckpoint('chapel', 'fromGraveyard');
         HC.dialogue.start('brazierLit', function () {
-          HC.quest.set('PROLOGUE COMPLETE - REST, OR GROW AT THE SHRINE');
+          G.refreshQuest();
+          var mins = Math.floor(HC.run.time / 60), secs = Math.floor(HC.run.time % 60);
+          G.endInfo = {
+            title: 'THE CHAPEL FLAME IS LIT',
+            sub: 'PROLOGUE COMPLETE',
+            stats: 'TIME ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '   DEATHS ' + HC.run.deaths + '   SLAIN ' + HC.run.kills,
+            lines: ['NEXT : QUEST 1 - LIGHT THE CHAPEL', 'SPEAK TO BROTHER COLE', 'THE BURNED VILLAGE WAITS ON THE WEST ROAD']
+          };
           G.state = 'end';
-          G.endShown = true;
+          G.saveGame();
         });
         break;
+      case 'toVillage':
+        if (!G.flags.q1Started) {
+          G.player.x = Math.max(G.player.x, 3.5 * HC.TILE);
+          HC.floaters.add(G.player.x, G.player.y - 18, 'THE ASH WIND BITES - SPEAK TO COLE FIRST', '#c9bfa4');
+        } else {
+          G.pendingMap = { map: 'village', entry: 'fromChapel' };
+        }
+        break;
+      case 'toChapelEast':
+        G.pendingMap = { map: 'chapel', entry: 'fromVillage' };
+        break;
+      case 'villageEnter':
+        if (G.flags.sawVillageEnter) break;
+        G.flags.sawVillageEnter = true;
+        G.setCheckpoint('village', 'fromChapel');
+        HC.dialogue.start('villageEnter');
+        break;
+      case 'villageChoice':
+        if (G.flags.sawVillageChoice || G.flags.choiceMade) break;
+        G.flags.sawVillageChoice = true;
+        HC.dialogue.start('villageChoice');
+        G.saveGame();
+        break;
+      case 'q1Return':
+        G.flags.q1Done = true;
+        G.flags.hasOil = false;
+        HC.audio.sfx.brazier();
+        HC.audio.setMusic('hub');
+        HC.camera.shake(3, 0.5);
+        HC.particles.burst(G.player.x, G.player.y - 20, 40, { color: '#ffd47a', spMin: 15, spMax: 90, lifeMax: 1.2, glow: 1 });
+        G.setCheckpoint('chapel', 'fromGraveyard');
+        HC.dialogue.start('q1Return', function () {
+          G.refreshQuest();
+          var mins = Math.floor(HC.run.time / 60), secs = Math.floor(HC.run.time % 60);
+          var who = G.flags.bramSaved ? 'BRAM THE CARPENTER JOINS CANDLEFALL' :
+                    G.flags.lysaSaved ? 'LYSA THE HERBALIST JOINS CANDLEFALL' : 'THE VILLAGE IS ASHES';
+          G.endInfo = {
+            title: 'QUEST 1 COMPLETE',
+            sub: 'LIGHT THE CHAPEL',
+            stats: 'TIME ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '   DEATHS ' + HC.run.deaths + '   SLAIN ' + HC.run.kills,
+            lines: [who, 'THE CHAPEL FLAME BURNS BRIGHT AND TRUE', 'NEXT : THE BELL TOWER - SILENCE THE CURSED BELL']
+          };
+          G.state = 'end';
+          G.saveGame();
+        });
+        break;
+    }
+  }
+
+  function spawnRescueWave(who, silent) {
+    var spots = who === 'bram'
+      ? [[4, 18], [8, 18.5], [6, 19.5], [9.5, 16]]
+      : [[31, 28.5], [35, 28.5], [33, 30], [30, 26]];
+    for (var i = 0; i < spots.length; i++) {
+      var t = i === 3 ? 'archer' : 'hollow';
+      var e = HC.makeEnemy(t, spots[i][0] * HC.TILE + 8, spots[i][1] * HC.TILE + 8, 'rescue');
+      e.rising = silent ? 0 : 0.9 + i * 0.25;
+      e.state = 'aggro';
+      G.ents.push(e);
+      if (!silent) HC.audio.sfx.rise();
     }
   };
 
@@ -194,7 +347,42 @@ HC.game = (function () {
     if (e.zone === 'z0' && !G.flags.z0Cleared && zoneClear('z0')) {
       setTimeout0(function () { G.event('z0Cleared'); });
     }
+    if (e.zone === 'rescue' && !G.flags.rescueDone && zoneClear('rescue')) {
+      setTimeout0(function () { G.rescueComplete(); });
+    }
   };
+
+  G.rescueComplete = function () {
+    G.flags.rescueDone = true;
+    var who = G.flags.choiceMade;
+    if (who === 'bram') {
+      G.flags.bramSaved = true;
+      G.player.guardDur = 1.1;
+      G.player.guardFactor = 0.15;
+    } else {
+      G.flags.lysaSaved = true;
+      G.player.maxFlasks = 4;
+      G.player.flaskHeal = 60;
+      G.player.flasks = Math.min(G.player.flasks + 1, G.player.maxFlasks);
+    }
+    refreshDoorPrompts();
+    HC.dialogue.start(who === 'bram' ? 'savedBram' : 'savedLysa', function () {
+      G.refreshQuest();
+      HC.toast(who === 'bram' ? 'BRAM HEADS FOR CANDLEFALL' : 'LYSA HEADS FOR CANDLEFALL');
+      G.saveGame();
+    });
+  };
+
+  function refreshDoorPrompts() {
+    var F = G.flags;
+    for (var i = 0; i < G.ents.length; i++) {
+      var e = G.ents[i];
+      if (e.kind === 'bramDoor')
+        e.prompt = F.choiceMade ? (F.choiceMade === 'bram' ? (F.rescueDone ? 'EMPTY WORKSHOP' : 'BRAM') : 'THE HAMMERING HAS STOPPED') : 'ANSWER THE HAMMERING';
+      if (e.kind === 'lysaDoor')
+        e.prompt = F.choiceMade ? (F.choiceMade === 'lysa' ? (F.rescueDone ? 'EMPTY CELLAR' : 'LYSA') : 'THE CELLAR IS SILENT') : 'ANSWER THE VOICE BELOW';
+    }
+  }
 
   var delayedCalls = [];
   function setTimeout0(fn) { delayedCalls.push({ t: 0.8, fn: fn }); }
@@ -210,8 +398,8 @@ HC.game = (function () {
   G.onBossDead = function () {
     G.flags.bossDead = true;
     G.boss = null;
-    HC.world.setGate('b', true);
-    HC.world.setGate('d', true);
+    HC.world.setGate('B', true);
+    HC.world.setGate('D', true);
     HC.run.checkpoint = { map: 'graveyard', entry: 'arena' };
     HC.audio.setMusic('ambient');
     setTimeout0(function () { G.event('bossDead'); });
@@ -252,31 +440,71 @@ HC.game = (function () {
   }
 
   function useInteract(it) {
-    HC.audio.sfx.interact();
+    var F = G.flags;
     if (it.kind === 'sword') {
+      HC.audio.sfx.interact();
       it.alive = false;
       G.event('swordTaken');
     } else if (it.kind === 'brazier') {
-      if (!G.flags.brazierLit) { G.event('brazierLit'); it.prompt = 'REST BY THE FLAME'; }
+      if (!F.brazierLit) { HC.audio.sfx.interact(); G.event('brazierLit'); it.prompt = 'REST BY THE FLAME'; }
+      else if (F.hasOil && !F.q1Done) { G.event('q1Return'); it.prompt = 'REST BY THE FLAME'; }
       else {
+        HC.audio.sfx.heal();
         G.player.hp = G.player.maxHp();
         G.player.flasks = G.player.maxFlasks;
-        HC.audio.sfx.heal();
+        G.player.st = G.player.maxSt();
         HC.floaters.add(G.player.x, G.player.y - 16, 'YOU REST BY THE FLAME', '#ffd47a');
+        HC.particles.burst(G.player.x, G.player.y - 6, 12, { color: '#ffd47a', spMin: 10, spMax: 40, lifeMax: 0.7, glow: 1 });
+        G.saveGame();
       }
     } else if (it.kind === 'shrine') {
-      if (!G.flags.shrineSeen) {
-        G.flags.shrineSeen = true;
+      HC.audio.sfx.interact();
+      if (!F.shrineSeen) {
+        F.shrineSeen = true;
         HC.dialogue.start('shrineFirst', function () { G.state = 'upgrade'; G.upgSel = 0; });
       } else { G.state = 'upgrade'; G.upgSel = 0; }
     } else if (it.kind === 'survivor') {
-      if (G.flags.brazierLit) HC.dialogue.start('survivorAfter');
-      else if (!G.flags.metCole) {
-        G.flags.metCole = true;
-        HC.dialogue.start('survivor', function () {
-          HC.quest.set('LIGHT THE CHAPEL FLAME');
-        });
+      HC.audio.sfx.interact();
+      if (F.q1Done) HC.dialogue.start('coleAfterQ1');
+      else if (F.brazierLit && !F.q1Started) {
+        F.q1Started = true;
+        HC.dialogue.start('q1Offer', function () { G.refreshQuest(); G.saveGame(); });
+      } else if (F.q1Started) HC.dialogue.start('coleWaitingQ1');
+      else if (!F.metCole) {
+        F.metCole = true;
+        HC.dialogue.start('survivor', function () { G.refreshQuest(); });
       } else HC.dialogue.start('survivorWaiting');
+    } else if (it.kind === 'oil') {
+      HC.audio.sfx.soul();
+      it.alive = false;
+      F.hasOil = true;
+      HC.particles.burst(it.x, it.y - 4, 12, { color: '#ffd47a', spMin: 10, spMax: 50, lifeMax: 0.7, glow: 1 });
+      HC.dialogue.start('oilTaken', function () { G.refreshQuest(); G.saveGame(); });
+    } else if (it.kind === 'bramDoor' || it.kind === 'lysaDoor') {
+      var mine = (it.kind === 'bramDoor') ? 'bram' : 'lysa';
+      if (!F.choiceMade) {
+        HC.audio.sfx.interact();
+        F.choiceMade = mine;
+        HC.camera.shake(2, 0.3);
+        refreshDoorPrompts();
+        HC.dialogue.start(mine === 'bram' ? 'rescueStartBram' : 'rescueStartLysa', function () {
+          spawnRescueWave(mine, false);
+          G.refreshQuest();
+          G.saveGame();
+        });
+      } else if (F.choiceMade === mine && !F.rescueDone) {
+        HC.dialogue.start(mine === 'bram' ? 'rescueStartBram' : 'rescueStartLysa');
+      } else if (F.choiceMade !== mine && !F.lostSeen) {
+        HC.audio.sfx.interact();
+        F.lostSeen = true;
+        HC.dialogue.start(mine === 'bram' ? 'lostBram' : 'lostLysa');
+      }
+    } else if (it.kind === 'bram') {
+      HC.audio.sfx.interact();
+      HC.dialogue.start('bramHub');
+    } else if (it.kind === 'lysa') {
+      HC.audio.sfx.interact();
+      HC.dialogue.start('lysaHub');
     }
   }
 
@@ -406,32 +634,95 @@ HC.game = (function () {
   }
 
   // ---------- screens ----------
+  G.titleSel = 0;
+  G.titleOpts = function () { return hasSave() ? ['CONTINUE', 'NEW GAME'] : ['NEW GAME']; };
+
+  var titleParallax = null;
   function drawTitle() {
-    ctx.fillStyle = '#0a0c1a';
+    var t = G.titleT;
+    // deep gradient sky
+    var sky = ctx.createLinearGradient(0, 0, 0, HC.VIEW_H);
+    sky.addColorStop(0, '#0b0e1e');
+    sky.addColorStop(0.55, '#0a0c18');
+    sky.addColorStop(1, '#08060c');
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
-    // drifting fog
+
+    // distant capital silhouette on the horizon (Solmire)
+    ctx.fillStyle = '#0c1020';
+    var hy = 150;
+    ctx.fillRect(0, hy, HC.VIEW_W, HC.VIEW_H - hy);
+    ctx.fillStyle = '#0e1226';
+    for (var s = 0; s < 14; s++) {
+      var sx = (s * 33 + 10) % HC.VIEW_W;
+      var sh = 14 + ((s * 7919) % 22);
+      ctx.fillRect(sx, hy - sh, 20, sh);
+      // tiny crown spire towers
+      if (s % 3 === 0) ctx.fillRect(sx + 8, hy - sh - 8, 4, 8);
+    }
+    // faint gold cathedral glow at center horizon
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    var hg = ctx.createRadialGradient(HC.VIEW_W / 2, hy, 4, HC.VIEW_W / 2, hy, 90);
+    hg.addColorStop(0, 'rgba(180,120,50,0.20)');
+    hg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(HC.VIEW_W / 2 - 90, hy - 90, 180, 100);
+    ctx.restore();
+
     HC.world.drawWeather(ctx, 0, 0, 1 / 60);
+
     var cw = HC.sprites.crown;
     ctx.imageSmoothingEnabled = false;
-    var t = G.titleT;
     var bob = Math.sin(t * 1.2) * 3;
+
+    // crown halo
     ctx.save();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.6;
     ctx.globalCompositeOperation = 'lighter';
-    var grd = ctx.createRadialGradient(HC.VIEW_W / 2, 74 + bob, 2, HC.VIEW_W / 2, 74 + bob, 60);
-    grd.addColorStop(0, 'rgba(216,180,85,0.35)');
+    var grd = ctx.createRadialGradient(HC.VIEW_W / 2, 66 + bob, 2, HC.VIEW_W / 2, 66 + bob, 66);
+    grd.addColorStop(0, 'rgba(216,180,85,0.4)');
+    grd.addColorStop(0.5, 'rgba(180,90,60,0.14)');
     grd.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grd;
-    ctx.fillRect(HC.VIEW_W / 2 - 60, 14 + bob, 120, 120);
+    ctx.fillRect(HC.VIEW_W / 2 - 66, 0 + bob, 132, 132);
     ctx.restore();
-    ctx.drawImage(cw, 0, 0, cw.width, cw.height, Math.round(HC.VIEW_W / 2 - cw.width * 1.5), Math.round(44 + bob), cw.width * 3, cw.height * 3);
-    HC.font.drawShadow(ctx, 'THE HOLLOW CROWN', HC.VIEW_W / 2, 96, '#e6dfc8', 2, 'center');
-    HC.font.draw(ctx, 'PROLOGUE : THE GRAVE WAKES', HC.VIEW_W / 2, 114, '#ffd47a', 1, 'center');
-    HC.font.draw(ctx, 'A DARK FANTASY ACTION RPG', HC.VIEW_W / 2, 126, '#6d7484', 1, 'center');
-    if (Math.floor(t * 1.6) % 2 === 0)
-      HC.font.draw(ctx, 'PRESS ANY KEY', HC.VIEW_W / 2, 152, '#e6dfc8', 1, 'center');
-    HC.font.draw(ctx, 'WASD MOVE  J ATTACK  SPACE DODGE  L GUARD  F EMBER  E INTERACT', HC.VIEW_W / 2, 190, '#4a5166', 1, 'center');
-    HC.font.draw(ctx, 'CLASS : ASH KNIGHT', HC.VIEW_W / 2, 204, '#4a5166', 1, 'center');
+
+    // crown with drifting embers rising from it
+    if (Math.random() < 0.4)
+      HC.particles.spawn({ x: HC.VIEW_W / 2 + HC.rand(-24, 24), y: 60 + bob, vx: HC.rand(-4, 4), vy: HC.rand(-14, -5), life: 1.4, color: Math.random() < 0.5 ? '#f2a13c' : '#ffd47a', size: 1 });
+    HC.particles.update(1 / 60);
+    HC.particles.draw(ctx, 0, 0);
+
+    ctx.drawImage(cw, 0, 0, cw.width, cw.height, Math.round(HC.VIEW_W / 2 - cw.width * 1.5), Math.round(30 + bob), cw.width * 3, cw.height * 3);
+
+    HC.font.drawShadow(ctx, 'THE HOLLOW CROWN', HC.VIEW_W / 2, 84, '#e6dfc8', 2, 'center');
+    // subtitle underline flourish
+    ctx.fillStyle = '#6e563c';
+    ctx.fillRect(HC.VIEW_W / 2 - 96, 104, 192, 1);
+    ctx.fillStyle = '#93262e';
+    ctx.fillRect(HC.VIEW_W / 2 - 3, 103, 6, 3);
+    HC.font.draw(ctx, 'PROLOGUE : THE GRAVE WAKES', HC.VIEW_W / 2, 110, '#c9975a', 1, 'center');
+
+    // menu
+    var opts = G.titleOpts();
+    if (G.titleSel >= opts.length) G.titleSel = 0;
+    var my = 134;
+    for (var i = 0; i < opts.length; i++) {
+      var sel = i === G.titleSel;
+      var yy = my + i * 16;
+      if (sel) {
+        var pulse = 0.5 + 0.5 * Math.sin(t * 5);
+        ctx.fillStyle = 'rgba(110,86,60,' + (0.2 + pulse * 0.15) + ')';
+        ctx.fillRect(HC.VIEW_W / 2 - 60, yy - 3, 120, 13);
+        HC.font.draw(ctx, '>', HC.VIEW_W / 2 - 52, yy, '#ffd47a', 1);
+        HC.font.draw(ctx, '<', HC.VIEW_W / 2 + 47, yy, '#ffd47a', 1);
+      }
+      HC.font.drawShadow(ctx, opts[i], HC.VIEW_W / 2, yy, sel ? '#ffd47a' : '#6d7484', 1, 'center');
+    }
+
+    HC.font.draw(ctx, 'WASD MOVE   J ATTACK   SPACE DODGE   L GUARD   F EMBER   E INTERACT', HC.VIEW_W / 2, 196, '#3f4658', 1, 'center');
+    HC.font.draw(ctx, 'CLASS : ASH KNIGHT   -   ARROW KEYS TO CHOOSE', HC.VIEW_W / 2, 208, '#3f4658', 1, 'center');
     HC.world.drawVignette(ctx);
   }
 
@@ -452,23 +743,34 @@ HC.game = (function () {
   }
 
   function drawEnd() {
+    var info = G.endInfo || { title: 'CHAPTER COMPLETE', sub: '', stats: '', lines: [] };
     ctx.fillStyle = 'rgba(6,8,18,0.85)';
     ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
-    var pw = 280, phh = 150, px = HC.VIEW_W / 2 - pw / 2, py = HC.VIEW_H / 2 - phh / 2;
+    var pw = 300, phh = 158, px = HC.VIEW_W / 2 - pw / 2, py = HC.VIEW_H / 2 - phh / 2;
+    // panel with warm inner glow
     ctx.fillStyle = 'rgba(14,12,22,0.97)';
     ctx.fillRect(px, py, pw, phh);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    var g2 = ctx.createRadialGradient(HC.VIEW_W / 2, py + 30, 4, HC.VIEW_W / 2, py + 30, 70);
+    g2.addColorStop(0, 'rgba(216,180,85,0.12)');
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g2;
+    ctx.fillRect(px, py, pw, phh);
+    ctx.restore();
     ctx.strokeStyle = '#6e563c'; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, phh - 1);
+    ctx.strokeStyle = 'rgba(110,86,60,0.4)'; ctx.strokeRect(px + 2.5, py + 2.5, pw - 5, phh - 5);
     var cw = HC.sprites.crown;
     ctx.drawImage(cw, px + pw / 2 - cw.width / 2, py + 8);
-    HC.font.drawShadow(ctx, 'THE CHAPEL FLAME IS LIT', HC.VIEW_W / 2, py + 26, '#ffd47a', 1, 'center');
-    HC.font.draw(ctx, 'PROLOGUE COMPLETE', HC.VIEW_W / 2, py + 40, '#e6dfc8', 1, 'center');
-    var mins = Math.floor(HC.run.time / 60), secs = Math.floor(HC.run.time % 60);
-    HC.font.draw(ctx, 'TIME ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '   DEATHS ' + HC.run.deaths + '   SLAIN ' + HC.run.kills, HC.VIEW_W / 2, py + 58, '#9aa3b2', 1, 'center');
-    HC.font.draw(ctx, 'NEXT : QUEST 1 - LIGHT THE CHAPEL', HC.VIEW_W / 2, py + 80, '#6d7484', 1, 'center');
-    HC.font.draw(ctx, 'THE BELL TOWER... THE CATACOMBS...', HC.VIEW_W / 2, py + 92, '#6d7484', 1, 'center');
-    HC.font.draw(ctx, 'AND SIR ALRIC, THE KNEELING KNIGHT', HC.VIEW_W / 2, py + 104, '#6d7484', 1, 'center');
+    HC.font.drawShadow(ctx, info.title, HC.VIEW_W / 2, py + 28, '#ffd47a', 1, 'center');
+    HC.font.draw(ctx, info.sub, HC.VIEW_W / 2, py + 42, '#e6dfc8', 1, 'center');
+    ctx.fillStyle = '#6e563c';
+    ctx.fillRect(HC.VIEW_W / 2 - 70, py + 54, 140, 1);
+    HC.font.draw(ctx, info.stats, HC.VIEW_W / 2, py + 62, '#8fe8ff', 1, 'center');
+    for (var i = 0; i < info.lines.length; i++)
+      HC.font.draw(ctx, info.lines[i], HC.VIEW_W / 2, py + 82 + i * 12, '#8a9078', 1, 'center');
     if (Math.floor(HC.world.time * 1.6) % 2 === 0)
-      HC.font.draw(ctx, 'PRESS ANY KEY TO KEEP EXPLORING', HC.VIEW_W / 2, py + phh - 16, '#e6dfc8', 1, 'center');
+      HC.font.draw(ctx, 'PRESS ANY KEY TO CONTINUE', HC.VIEW_W / 2, py + phh - 14, '#e6dfc8', 1, 'center');
   }
 
   function drawPause() {
@@ -508,6 +810,7 @@ HC.game = (function () {
     for (var j = 0; j < ysorted.length; j++) ysorted[j].draw(ctx);
 
     HC.particles.draw(ctx, cx, cy);
+    HC.world.drawAtmosphere(ctx, cx, cy, 1 / 60);
 
     // lights
     var lights = [];
@@ -527,13 +830,23 @@ HC.game = (function () {
     HC.audio.update();
     if (G.state === 'title') {
       G.titleT += dt;
-      if (HC.input.hit('any')) {
+      var opts = G.titleOpts();
+      if (HC.input.hit('up')) { G.titleSel = (G.titleSel + opts.length - 1) % opts.length; HC.audio.sfx.ui(); }
+      if (HC.input.hit('down')) { G.titleSel = (G.titleSel + 1) % opts.length; HC.audio.sfx.ui(); }
+      if (HC.input.hit('attack') || HC.input.hit('interact') || HC.input.hit('dodge')) {
         HC.audio.ensure();
-        newRun();
-        G.loadMap('graveyard', 'start');
+        var choice = opts[G.titleSel];
+        if (choice === 'CONTINUE' && loadSave()) {
+          G.loadMap(HC.run.checkpoint.map, HC.run.checkpoint.entry);
+        } else {
+          clearSave();
+          newRun();
+          G.loadMap('graveyard', 'start');
+          if (HC.DEBUG) HC.run.souls = 300;
+        }
         G.state = 'play';
         G.fade = 1; G.fadeDir = -1;
-        if (HC.DEBUG) HC.run.souls = 300;
+        HC.audio.sfx.interact();
       }
       return;
     }
@@ -546,7 +859,8 @@ HC.game = (function () {
     if (G.state === 'end') {
       HC.world.update(dt);
       HC.particles.update(dt);
-      if (HC.input.hit('any')) G.state = 'play';
+      G.endT = (G.endT || 0) + dt;
+      if (G.endT > 0.6 && HC.input.hit('any')) { G.endT = 0; G.state = 'play'; }
       return;
     }
 

@@ -21,10 +21,10 @@ HC.maps = (function () {
   g.push(R('26:,', '4:p', '14:,'));                                  // 0 exit to chapel
   g.push(R('26:,', '4:p', '14:,'));                                  // 1
   g.push(R('26:,', '4:p', '14:,'));                                  // 2
-  g.push(R('2:,', '4:.', '20:F', '4:d', '8:F', '4:.', '2:,'));       // 3 arena north fence + exit gate
+  g.push(R('2:,', '4:.', '20:F', '4:D', '8:F', '4:.', '2:,'));       // 3 arena north fence + exit gate
   for (var r4 = 4; r4 <= 19; r4++)
     g.push(R('2:,', '4:.', '1:F', '30:.', '1:F', '6:,'));            // 4-19 boss arena
-  g.push(R('2:,', '4:.', '13:F', '4:b', '15:F', '6:,'));             // 20 arena south fence + boss gate
+  g.push(R('2:,', '4:.', '13:F', '4:B', '15:F', '6:,'));             // 20 arena south fence + boss gate
   for (var r21 = 21; r21 <= 30; r21++)
     g.push(R('2:,', '17:.', '4:p', '19:.', '2:,'));                  // 21-30 path north segment
   g.push(R('2:,', '14:.', '7:p', '19:.', '2:,'));                    // 31 bend
@@ -32,7 +32,7 @@ HC.maps = (function () {
   g.push(R('2:,', '10:.', '5:p', '25:.', '2:,'));                    // 33
   for (var r34 = 34; r34 <= 44; r34++)
     g.push(R('2:,', '10:.', '4:p', '26:.', '2:,'));                  // 34-44 path west segment
-  g.push(R('2:,', '4:.', '6:F', '4:a', '22:F', '6:,'));              // 45 zone gate
+  g.push(R('2:,', '4:.', '6:F', '4:A', '22:F', '6:,'));              // 45 zone gate
   for (var r46 = 46; r46 <= 49; r46++)
     g.push(R('2:,', '10:.', '4:p', '26:.', '2:,'));                  // 46-49
   g.push(R('2:,', '10:.', '8:p', '22:.', '2:,'));                    // 50 bend east
@@ -85,7 +85,7 @@ HC.maps = (function () {
       { type: 'wisp', x: 33, y: 17 }, { type: 'wisp', x: 35, y: 62 },
       { type: 'ember', x: 36, y: 44 }, { type: 'ember', x: 24, y: 47 }
     ],
-    gates: { a: { open: false }, b: { open: true }, d: { open: false } },
+    gates: { A: { open: false }, B: { open: true }, D: { open: false } },
     triggers: [
       { x0: 16, y0: 63, x1: 30, y1: 70, event: 'intro', once: true },
       { x0: 17, y0: 21, x1: 25, y1: 23, event: 'preBoss', once: true },
@@ -103,8 +103,10 @@ HC.maps = (function () {
   for (var c7 = 7; c7 <= 16; c7++)
     c.push(R('2:,', '4:.', '1:F', '20:f', '1:F', '4:.', '2:,'));      // 7-16 courtyard
   c.push(R('2:,', '4:.', '1:F', '8:F', '4:f', '8:F', '1:F', '4:.', '2:,')); // 17 courtyard fence + opening
-  for (var c18 = 18; c18 <= 29; c18++)
-    c.push(R('2:,', '13:.', '4:p', '13:.', '2:,'));                   // 18-29 approach road
+  for (var c18 = 18; c18 <= 29; c18++) {
+    if (c18 === 20 || c18 === 21) c.push(R('19:p', '13:.', '2:,'));   // 20-21 west road to the burned village
+    else c.push(R('2:,', '13:.', '4:p', '13:.', '2:,'));              // approach road
+  }
 
   var chapel = {
     id: 'chapel',
@@ -115,15 +117,17 @@ HC.maps = (function () {
     rain: true,
     entries: {
       fromGraveyard: { x: 16.5, y: 27, face: 'up' },
+      fromVillage: { x: 1.5, y: 21, face: 'right' },
       start: { x: 16.5, y: 27, face: 'up' }
     },
     props: [
       { type: 'chapel', x: 13, y: 1 },
       { type: 'gatepost', at: [[14, 16], [19, 16]] },
       { type: 'candles', at: [[9, 8], [25, 13], [12, 14], [20, 8], [24, 8], [8, 12]] },
-      { type: 'tree', at: [[3, 4], [30, 6], [4, 20], [29, 22], [2, 12], [31, 11], [4, 26], [29, 27]] },
-      { type: 'tomb', at: [[9, 20], [24, 21], [27, 25]] },
-      { type: 'skulls', at: [[8, 15]] }
+      { type: 'tree', at: [[3, 4], [30, 6], [4, 26], [29, 22], [2, 12], [31, 11], [7, 24], [29, 27]] },
+      { type: 'tomb', at: [[9, 24], [24, 21], [27, 25]] },
+      { type: 'skulls', at: [[8, 15]] },
+      { type: 'sign', at: [[13, 19]] }
     ],
     spawns: [
       { type: 'brazier', x: 16, y: 11 },
@@ -133,11 +137,73 @@ HC.maps = (function () {
     gates: {},
     triggers: [
       { x0: 13, y0: 21, x1: 20, y1: 26, event: 'chapelIntro', once: true },
-      { x0: 14, y0: 29, x1: 19, y1: 29, event: 'toGraveyard' }
+      { x0: 14, y0: 29, x1: 19, y1: 29, event: 'toGraveyard' },
+      { x0: 0, y0: 19, x1: 0, y1: 22, event: 'toVillage' }
     ]
   };
 
-  return { graveyard: graveyard, chapel: chapel };
+  // ---------- The Burned Village: 46 x 34 ----------
+  var v = [];
+  v.push(R('46:,'));                                                  // 0
+  v.push(R('46:,'));                                                  // 1
+  for (var v2 = 2; v2 <= 11; v2++)
+    v.push(R('2:,', '42:a', '2:,'));                                  // 2-11 north ash field
+  for (var v12 = 12; v12 <= 15; v12++)
+    v.push(R('2:,', '16:a', '12:x', '14:a', '2:,'));                  // 12-15 plaza north
+  v.push(R('18:p', '12:x', '16:p'));                                  // 16 road
+  v.push(R('18:p', '12:x', '16:p'));                                  // 17 road
+  for (var v18 = 18; v18 <= 22; v18++)
+    v.push(R('2:,', '16:a', '12:x', '14:a', '2:,'));                  // 18-22 plaza south
+  for (var v23 = 23; v23 <= 31; v23++)
+    v.push(R('2:,', '42:a', '2:,'));                                  // 23-31 south ash field
+  v.push(R('46:,'));                                                  // 32
+  v.push(R('46:,'));                                                  // 33
+
+  var village = {
+    id: 'village',
+    name: 'THE BURNED VILLAGE',
+    grid: v,
+    darkness: 0.78,
+    music: 'ambient',
+    rain: true,
+    entries: {
+      fromChapel: { x: 44, y: 16.5, face: 'left' },
+      start: { x: 44, y: 16.5, face: 'left' }
+    },
+    props: [
+      { type: 'bhouse64', at: [[19, 2], [3, 12]] },
+      { type: 'bhouse48', at: [[31, 22], [10, 25], [38, 3], [8, 5]] },
+      { type: 'well', at: [[23, 16]] },
+      { type: 'cart', at: [[14, 18], [35, 14]] },
+      { type: 'smolder', at: [[16, 13], [30, 20], [8, 18], [36, 26], [21, 10], [25, 4], [12, 28], [40, 17], [28, 12]] },
+      { type: 'cellar', at: [[33, 26]] },
+      { type: 'sign', at: [[42, 15]] },
+      { type: 'tree', at: [[2, 6], [43, 8], [2, 29], [43, 29], [28, 31], [17, 31]] },
+      { type: 'candles', at: [[5, 14], [32, 27]] },
+      { type: 'skulls', at: [[26, 18]] }
+    ],
+    spawns: [
+      { type: 'hollow', x: 33, y: 11, zone: 'v' },
+      { type: 'hollow', x: 28, y: 30, zone: 'v' },
+      { type: 'hollow', x: 14, y: 10, zone: 'v' },
+      { type: 'archer', x: 26, y: 6, zone: 'v' },
+      { type: 'cultist', x: 22, y: 8, zone: 'v' },
+      { type: 'dog', x: 40, y: 13, zone: 'v' },
+      { type: 'oil', x: 21, y: 6 },
+      { type: 'bramDoor', x: 6, y: 16 },
+      { type: 'lysaDoor', x: 33, y: 27 },
+      { type: 'wisp', x: 4, y: 8 }, { type: 'wisp', x: 41, y: 27 },
+      { type: 'ember', x: 24, y: 19 }
+    ],
+    gates: {},
+    triggers: [
+      { x0: 45, y0: 15, x1: 45, y1: 18, event: 'toChapelEast' },
+      { x0: 38, y0: 15, x1: 42, y1: 18, event: 'villageEnter', once: true },
+      { x0: 19, y0: 13, x1: 28, y1: 21, event: 'villageChoice', once: true }
+    ]
+  };
+
+  return { graveyard: graveyard, chapel: chapel, village: village };
 })();
 
 // ---------- world runtime ----------
@@ -152,7 +218,8 @@ HC.world = (function () {
   var SOLID_TILES = { '#': 1, 'F': 1 };
   var GROUND = {
     '.': 'grass', ',': 'darkgrass', 'p': 'path', 'm': 'mud', 'f': 'stonefloor',
-    '#': 'wall', 'F': 'grass', 'a': 'path', 'b': 'grass', 'd': 'path'
+    'a': 'ash', 'x': 'charfloor',
+    '#': 'wall', 'F': 'grass', 'A': 'path', 'B': 'grass', 'D': 'path'
   };
 
   function hash2(x, y) { return Math.abs((x * 73856093) ^ (y * 19349663)) >>> 0; }
@@ -174,7 +241,7 @@ HC.world = (function () {
     for (var gy = 0; gy < W.ht; gy++) {
       for (var gx = 0; gx < W.wt; gx++) {
         var ch = W.charAt(gx, gy);
-        if (ch === 'a' || ch === 'b' || ch === 'd') {
+        if (ch === 'A' || ch === 'B' || ch === 'D') {
           if (!W.gates[ch]) W.gates[ch] = { tiles: [], open: mapDef.gates[ch] ? mapDef.gates[ch].open : false, anim: 0 };
           W.gates[ch].tiles.push([gx, gy]);
         }
@@ -234,6 +301,47 @@ HC.world = (function () {
         p.base = p.y + 18;
         p.solid = { x: p.x + 5, y: p.y + 6, w: 6, h: 10 };
         p.light = { x: p.x + 8, y: p.y + 2, r: 30, warm: 1, flicker: 1 };
+      } else if (type === 'bhouse64' || type === 'bhouse48') {
+        var bw = type === 'bhouse64' ? 64 : 48, bhh = type === 'bhouse64' ? 44 : 40;
+        p.img = S.burnedHouse(hash2(tx, ty), bw, bhh);
+        p.ox = 0; p.oy = 0;
+        p.base = p.y + bhh;
+        p.solid = { x: p.x + 1, y: p.y + 10, w: bw - 2, h: bhh - 12 };
+        W.lights.push({ x: p.x + bw / 2, y: p.y + bhh - 8, r: 22, warm: 1, flicker: 1 });
+      } else if (type === 'well') {
+        p.img = S.well;
+        p.ox = -1; p.oy = 0;
+        p.base = p.y + 16;
+        p.solid = { x: p.x + 1, y: p.y + 7, w: 14, h: 8 };
+      } else if (type === 'cart') {
+        p.img = S.cart;
+        p.ox = -3; p.oy = 3;
+        p.base = p.y + 16;
+        p.solid = { x: p.x - 1, y: p.y + 5, w: 18, h: 8 };
+      } else if (type === 'smolder') {
+        p.img = S.smolder;
+        p.ox = 1; p.oy = 7;
+        p.base = 0;
+        p.light = { x: p.x + 8, y: p.y + 12, r: 34, warm: 1, flicker: 1 };
+      } else if (type === 'cellar') {
+        p.img = S.cellarDoors;
+        p.ox = 0; p.oy = 3;
+        p.base = p.y + 15;
+      } else if (type === 'sign') {
+        p.img = S.signpost;
+        p.ox = 2; p.oy = -2;
+        p.base = p.y + 16;
+        p.solid = { x: p.x + 6, y: p.y + 10, w: 4, h: 5 };
+      } else if (type === 'tent') {
+        p.img = S.tent;
+        p.ox = -2; p.oy = 1;
+        p.base = p.y + 16;
+        p.solid = { x: p.x - 2, y: p.y + 6, w: 20, h: 9 };
+      } else if (type === 'herbtable') {
+        p.img = S.herbTable;
+        p.ox = 0; p.oy = 4;
+        p.base = p.y + 16;
+        p.solid = { x: p.x + 1, y: p.y + 8, w: 14, h: 7 };
       }
       if (p.light) W.lights.push(p.light);
       W.props.push(p);
@@ -243,6 +351,7 @@ HC.world = (function () {
       if (pd.at) for (var ai = 0; ai < pd.at.length; ai++) addProp(pd.type, pd.at[ai][0], pd.at[ai][1]);
       else addProp(pd.type, pd.x, pd.y);
     }
+    W.spawnProp = addProp;
 
     // fences as static y-sorted sprites
     for (var fy = 0; fy < W.ht; fy++)
@@ -283,7 +392,7 @@ HC.world = (function () {
 
   W.gateSolidAt = function (tx, ty) {
     var ch = W.charAt(tx, ty);
-    if (ch !== 'a' && ch !== 'b' && ch !== 'd') return false;
+    if (ch !== 'A' && ch !== 'B' && ch !== 'D') return false;
     var gg = W.gates[ch];
     return gg && !gg.open;
   };
@@ -413,6 +522,17 @@ HC.world = (function () {
           // flat decor: draw immediately under everything
           ctx.drawImage(p.img, Math.round(p.x - cx + p.ox), Math.round(p.y - cy + p.oy));
         } else {
+          // soft grounding shadow under solid props
+          if (p.solid) {
+            var sw = p.solid.w, sy = p.solid.y + p.solid.h - 2;
+            ctx.save();
+            ctx.globalAlpha = 0.28;
+            ctx.fillStyle = '#05060d';
+            ctx.beginPath();
+            ctx.ellipse(Math.round(p.solid.x + sw / 2 - cx), Math.round(sy - cy), sw * 0.52, Math.max(3, sw * 0.16), 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
           ysorted.push({
             base: p.base,
             draw: function (ctx2) {
@@ -475,6 +595,29 @@ HC.world = (function () {
     ctx.restore();
   };
 
+  // ambient motes: slow-drifting dust/ash caught in the lantern light, lit naturally
+  // because this layer draws before the darkness pass
+  var motes = [];
+  for (var mi = 0; mi < 40; mi++)
+    motes.push({
+      x: Math.random() * HC.VIEW_W, y: Math.random() * HC.VIEW_H,
+      vx: HC.rand(-6, 6), vy: HC.rand(-3, 5),
+      ph: Math.random() * 7, sp: HC.rand(0.5, 1.6), warm: Math.random() < 0.5
+    });
+  W.drawAtmosphere = function (ctx, cx, cy, dt) {
+    for (var i = 0; i < motes.length; i++) {
+      var m = motes[i];
+      m.x += m.vx * dt; m.y += m.vy * dt;
+      if (m.x < 0) m.x += HC.VIEW_W; else if (m.x > HC.VIEW_W) m.x -= HC.VIEW_W;
+      if (m.y < 0) m.y += HC.VIEW_H; else if (m.y > HC.VIEW_H) m.y -= HC.VIEW_H;
+      var tw = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(W.time * m.sp * 2 + m.ph));
+      ctx.globalAlpha = tw * 0.5;
+      ctx.fillStyle = m.warm ? '#ffd9a0' : '#9fc4e8';
+      ctx.fillRect(Math.round(m.x), Math.round(m.y), 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  };
+
   // fog + rain
   var fogBlobs = [];
   for (var fi = 0; fi < 7; fi++)
@@ -482,6 +625,7 @@ HC.world = (function () {
   var rainDrops = [];
   for (var ri = 0; ri < 46; ri++)
     rainDrops.push({ x: Math.random() * HC.VIEW_W, y: Math.random() * HC.VIEW_H, sp: 150 + Math.random() * 120, len: 4 + Math.random() * 5 });
+  var splashes = [];
 
   W.drawWeather = function (ctx, cx, cy, dt) {
     ctx.save();
@@ -506,12 +650,28 @@ HC.world = (function () {
       for (var j = 0; j < rainDrops.length; j++) {
         var d = rainDrops[j];
         d.y += d.sp * dt; d.x -= d.sp * 0.18 * dt;
-        if (d.y > HC.VIEW_H) { d.y = -8; d.x = Math.random() * (HC.VIEW_W + 40); }
+        if (d.y > HC.VIEW_H) {
+          // leave a brief splash where the drop lands
+          if (splashes.length < 30 && Math.random() < 0.5)
+            splashes.push({ x: d.x, y: HC.rand(HC.VIEW_H * 0.45, HC.VIEW_H), t: 0 });
+          d.y = -8; d.x = Math.random() * (HC.VIEW_W + 40);
+        }
         if (d.x < -10) d.x += HC.VIEW_W + 20;
         ctx.moveTo(d.x, d.y);
         ctx.lineTo(d.x + d.len * 0.18, d.y + d.len);
       }
       ctx.stroke();
+      // splashes
+      for (var s = splashes.length - 1; s >= 0; s--) {
+        var sp = splashes[s];
+        sp.t += dt;
+        if (sp.t > 0.28) { splashes.splice(s, 1); continue; }
+        var r = sp.t * 14;
+        ctx.strokeStyle = 'rgba(160,185,230,' + (0.22 * (1 - sp.t / 0.28)) + ')';
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, r, Math.PI * 1.05, Math.PI * 1.95);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   };
