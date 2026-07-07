@@ -24,24 +24,30 @@ Add `?debug` to the URL for dev keys: `1`/`2` teleport, `3` jump to chapel, `G` 
 
 ## What's in the slice
 
-This implements **Milestones 0–7** of the plan's build roadmap (§16), scoped to the Prologue quest
-(§9, "The Grave Wakes"):
+This implements **Milestones 0–9** of the plan's build roadmap (§16), covering the Prologue
+(§9, "The Grave Wakes") **and Quest 1** ("Light the Chapel") with its signature moral choice:
 
 - **Combat prototype** — stamina-based melee with combos, dodge i-frames, guard, knockback,
   hit-stop, screen shake, damage numbers (Milestone 0)
 - **Pixel visual direction** — deep navy / charcoal palette, warm lantern light against cold blue
-  fog, rain, dynamic 2D lighting with flicker, readable chunky silhouettes (Milestone 1, §3)
-- **Candlefall Chapel hub, Stage 0 → Stage 1** — ruined chapel, one dying NPC (Brother Cole),
-  brazier rest point; lighting the flame visibly transforms the hub: windows glow, darkness lifts,
-  music warms (Milestones 2 & 7, §7)
+  fog, rain with landing splashes, drifting ash motes caught in the light, dynamic 2D lighting
+  with flicker, soft grounding shadows, readable chunky silhouettes (Milestone 1, §3)
+- **Candlefall Chapel hub, Stage 0 → 1 → 2** — ruined chapel, dying NPC (Brother Cole), brazier
+  rest point; lighting the flame, then feeding it holy oil, visibly brightens the hub in stages;
+  rescued villagers appear as camp NPCs with their own tents/tables (Milestones 2 & 7, §7)
 - **RPG systems** — Remembrance souls from kills, the Shrine spends it on Health / Stamina /
-  Strength; ember flasks; checkpoints (Milestone 3, §12)
+  Strength; ember flasks; checkpoints; **localStorage save + Continue** (Milestones 3 & 9, §12)
 - **Tutorial graveyard** — mass grave opening, weapon pickup, scripted rising dead, gated combat
   zones, exploration pickups (Milestone 4)
 - **First boss** — The Gravekeeper: shovel swings, corpse summons, and a bell-shockwave second
   phase, exactly as speced in §11; 3 phases, boss bar, arena gates (Milestone 6)
-- **Quest & dialogue system** — objective tracker, portrait dialogue with Vela / Cole /
-  the Gravekeeper, triggers, multi-map flow, prologue end screen
+- **Quest 1: Light the Chapel** — the Burned Village zone (ash fields, charred houses with
+  smoldering interiors), the new **Bell Cultist** enemy firing homing soul-bolts, holy-oil
+  objective, and the **save-Bram-or-Lysa choice** (§13): whoever you answer first lives and
+  joins the hub, the other is lost. Each survivor grants a distinct permanent perk — Bram
+  reinforces the Ash Guard, Lysa deepens and adds an ember flask (Milestone 8)
+- **Quest & dialogue system** — flag-driven objective tracker, portrait dialogue with Vela / Cole /
+  the Gravekeeper / Bram / Lysa, triggers, multi-map flow, per-chapter end screens, title menu
 
 ## Architecture (how the full game grows from here)
 
@@ -69,11 +75,11 @@ Everything expansion-shaped is **data, not code**:
 
 ## Next milestones (from the plan doc)
 
-1. **Quest 1: Light the Chapel** — burned village mini-zone, the Bram-or-Lysa choice (Milestone 8)
-2. **The Bell Tower** — Bell-Ringer Twins mini-boss
-3. **Chapel Catacombs** — first real dungeon: shortcuts, traps, elite enemy (Milestone 5)
-4. **Sir Alric the Kneeling Knight** — first shard of the Mourning Blade
-5. Companion system (Mara Vey), save/load, menus polish (Milestone 9)
+1. **The Bell Tower** — climb the ruined tower, silence the cursed bell, Bell-Ringer Twins mini-boss
+2. **Chapel Catacombs** — first real dungeon: shortcuts, traps, elite enemy (Milestone 5)
+3. **Sir Alric the Kneeling Knight** — first shard of the Mourning Blade (§9 Quest 3)
+4. Full companion system with bond conversations (Mara Vey), character creation, menu polish
+5. **The Briarwood** — second region, proving the map system scales (Milestone 10)
 
 *Build in small, finished passes. Do not build every region at once.* — the plan's final rule,
 and this codebase's too.

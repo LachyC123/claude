@@ -55,6 +55,66 @@ HC.script = {
   ],
   shrineFirst: [
     { who: 'VELA', text: 'Give the shrine what the dead gave you. Remembrance becomes strength. It is the only fair trade left in this kingdom.' }
+  ],
+
+  // ---------- Quest 1: Light the Chapel ----------
+  q1Offer: [
+    { who: 'BROTHER COLE', text: 'The flame is lit, but rain and fog will drown it by dawn. It needs holy oil. The village stores kept casks of it, before the burning.' },
+    { who: 'BROTHER COLE', text: 'And Gravebound... last night I heard them on the west wind. Bram, hammering his workshop shut. Lysa, calling from her cellar.' },
+    { who: 'BROTHER COLE', text: 'Two of ours, still alive in that ash. I could not go. I am not ashamed... I am not.' },
+    { who: 'VELA', text: 'Oil for the flame, and whoever we can pull from the dark. The west road, Gravebound.' }
+  ],
+  coleWaitingQ1: [
+    { who: 'BROTHER COLE', text: 'The west road, past the signpost. Hurry. The dead do not tire of knocking.' }
+  ],
+  villageEnter: [
+    { who: 'VELA', text: 'Candlefall village. The Crown soldiers burned it for the crime of feeding rebels.' },
+    { who: 'VELA', text: 'Ash keeps no one warm. But something in it is still moving. Stay sharp.' }
+  ],
+  villageChoice: [
+    { who: 'VELA', text: 'Listen. Hammering, west - Bram is barricaded and the dead are through his wall.' },
+    { who: 'VELA', text: 'And below the east houses - Lysa, in her cellar. Water rising, dead above.' },
+    { who: 'VELA', text: 'One night. One of you. Whoever you answer first, the other... the fog is faster than we are. Choose, Gravebound.' }
+  ],
+  rescueStartBram: [
+    { who: 'BRAM', text: 'WHO IS THERE? Living or dead, this hammer does not care!' },
+    { who: 'VELA', text: 'They heard him too. Here they come. Keep them off the workshop!' }
+  ],
+  rescueStartLysa: [
+    { who: 'LYSA', text: 'Hello?! Please - the doors, the water is at my knees and something is scratching the wood!' },
+    { who: 'VELA', text: 'They heard her too. Here they come. Keep them off the cellar!' }
+  ],
+  savedBram: [
+    { who: 'BRAM', text: 'Hah! Still standing. Bram, carpenter. You swing like a soldier and block like a barn door - I can fix one of those.' },
+    { who: 'BRAM', text: 'A chapel flame, you say? Then Candlefall has walls again. I will follow the glow. Go, finish what you came for.' },
+    { who: 'VELA', text: 'The east cellar has gone quiet. We chose, Gravebound. Remember what it cost.' }
+  ],
+  savedLysa: [
+    { who: 'LYSA', text: 'Air - AIR. Thank you. Lysa. Herbalist. You bleed like a man who thinks flasks grow on trees. They do, if you know the tree.' },
+    { who: 'LYSA', text: 'A flame at the chapel? Then there is somewhere to boil water again. I will follow the glow. Go - take what you came for.' },
+    { who: 'VELA', text: 'The hammering has stopped, in the west. We chose, Gravebound. Remember what it cost.' }
+  ],
+  lostBram: [
+    { who: 'VELA', text: 'The barricade is torn open from the inside... he swung until the end. Say his name once, and do not look further.' }
+  ],
+  lostLysa: [
+    { who: 'VELA', text: 'The cellar doors float on black water. No one is calling now. Say her name once, and do not look down.' }
+  ],
+  oilTaken: [
+    { who: 'VELA', text: 'Holy oil - pressed in the old chapel, blessed against fog and worse. The flame will drink it gladly. Back to Candlefall.' }
+  ],
+  q1Return: [
+    { who: 'VELA', text: 'Pour it slow... there. Look at it stand up against the rain. That flame will outlive the night now. Maybe the winter.' },
+    { who: 'BROTHER COLE', text: 'By every drowned saint. You went into the ash and came back. Candlefall owes you twice now.' }
+  ],
+  bramHub: [
+    { who: 'BRAM', text: 'Reinforced your guard-arm bracing while you slept. Ash Guard will hold longer and turn more steel. Do not thank me, just do not die.' }
+  ],
+  lysaHub: [
+    { who: 'LYSA', text: 'I cut your flasks with silverleaf. They hold more, heal deeper. And there is a fourth - carry it for the road.' }
+  ],
+  coleAfterQ1: [
+    { who: 'BROTHER COLE', text: 'The glow reaches the tree line now. Others will come. And when they do... that cursed bell in the tower must be silenced. Soon.' }
   ]
 };
 
@@ -62,7 +122,9 @@ HC.speakers = {
   'VELA': { color: '#ffd47a', sprite: function () { return HC.sprites.vela[0]; } },
   'GRAVEBOUND': { color: '#8fe8ff', sprite: function () { return HC.sprites.player.down[0]; } },
   'GRAVEKEEPER': { color: '#c04a50', sprite: function () { return HC.sprites.gravekeeper[0]; } },
-  'BROTHER COLE': { color: '#9aa3b2', sprite: function () { return HC.sprites.survivor; } }
+  'BROTHER COLE': { color: '#9aa3b2', sprite: function () { return HC.sprites.survivor; } },
+  'BRAM': { color: '#c9975a', sprite: function () { return HC.sprites.bram; } },
+  'LYSA': { color: '#8fce7a', sprite: function () { return HC.sprites.lysa; } }
 };
 
 HC.dialogue = (function () {
