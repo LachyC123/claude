@@ -1,0 +1,676 @@
+// The Hollow Crown — game orchestration: states, map/event flow, HUD, main loop
+'use strict';
+
+HC.run = null;
+
+HC.game = (function () {
+  var G = {
+    state: 'title',
+    ents: [], player: null, vela: null, boss: null,
+    hitstop: 0, fade: 1, fadeDir: -1,
+    mapBannerT: 0, deathT: 0, endShown: false,
+    upgSel: 0, flags: null, pendingMap: null,
+    titleT: 0
+  };
+  var canvas, ctx;
+
+  // ---------- run state ----------
+  function newRun() {
+    HC.run = {
+      souls: 0,
+      stats: { hp: 0, st: 0, str: 0 },
+      checkpoint: { map: 'graveyard', entry: 'start' },
+      time: 0, deaths: 0, kills: 0
+    };
+    G.flags = {
+      swordTaken: false, graveCleared: false, z0Cleared: false,
+      bossDead: false, brazierLit: false, metCole: false,
+      shrineSeen: false, prologueDone: false
+    };
+  }
+
+  // ---------- map loading ----------
+  G.loadMap = function (mapId, entry) {
+    var def = HC.maps[mapId];
+    var spawn = HC.world.load(def, entry);
+    G.ents = [];
+    G.boss = null;
+
+    for (var i = 0; i < def.spawns.length; i++) {
+      var s = def.spawns[i];
+      if (s.type === 'gravekeeper') {
+        if (G.flags.bossDead) continue;
+        G.boss = HC.makeGravekeeper(s.x * HC.TILE + 8, s.y * HC.TILE + 8);
+        G.ents.push(G.boss);
+      } else if (HC.ENEMY_DEFS[s.type]) {
+        if (s.delayed && !G.flags[s.delayed]) continue;
+        var e = HC.makeEnemy(s.type, s.x * HC.TILE + 8, s.y * HC.TILE + 8, s.zone);
+        e.rising = 0;
+        G.ents.push(e);
+      } else if (s.type === 'wisp' || s.type === 'ember') {
+        G.ents.push(HC.makePickup(s.type, s.x, s.y));
+      } else if (s.type === 'sword') {
+        if (!G.flags.swordTaken) G.ents.push(HC.makeInteractable('sword', s.x, s.y));
+      } else {
+        G.ents.push(HC.makeInteractable(s.type, s.x, s.y));
+      }
+    }
+
+    G.player = HC.makePlayer(spawn.x, spawn.y);
+    G.player.face = spawn.face || 'down';
+    G.player.hasSword = G.flags.swordTaken;
+    G.vela = HC.makeVela(G.player);
+    G.ents.push(G.vela);
+
+    // gates re-apply persistent flags
+    if (mapId === 'graveyard') {
+      if (G.flags.z0Cleared) HC.world.gates.a.open = true, HC.world.gates.a.anim = 1;
+      if (G.flags.bossDead) {
+        HC.world.gates.b.open = true; HC.world.gates.b.anim = 1;
+        HC.world.gates.d.open = true; HC.world.gates.d.anim = 1;
+      }
+      // triggers that already fired stay quiet
+      markFired('intro', true);
+      if (G.flags.bossDead) { markFired('preBoss'); markFired('bossStart'); }
+    }
+    if (mapId === 'chapel') {
+      if (G.flags.brazierLit) HC.world.setChapelLit();
+      if (G.flags.metCole || G.flags.brazierLit) markFired('chapelIntro');
+    }
+
+    HC.camera.snap(G.player.x, G.player.y);
+    HC.audio.setMusic(G.flags.brazierLit && mapId === 'chapel' ? 'hub' : def.music);
+    G.mapBannerT = 3;
+    G.currentMap = mapId;
+
+    function markFired(ev, onlyIfSeen) {
+      for (var t = 0; t < HC.world.triggers.length; t++) {
+        var tr = HC.world.triggers[t];
+        if (tr.event === ev) {
+          if (onlyIfSeen && !G.flags.sawIntro) continue;
+          tr.fired = true;
+        }
+      }
+    }
+  };
+
+  // ---------- events ----------
+  G.event = function (name) {
+    switch (name) {
+      case 'intro':
+        G.flags.sawIntro = true;
+        HC.dialogue.start('intro', function () {
+          HC.quest.set('FIND A WEAPON IN THE MASS GRAVE');
+        });
+        break;
+      case 'swordTaken':
+        G.flags.swordTaken = true;
+        G.player.hasSword = true;
+        HC.audio.sfx.soul();
+        HC.dialogue.start('swordTaken', function () {
+          HC.quest.set('CUT DOWN THE RISEN DEAD');
+          HC.toast('J / X : ATTACK      SPACE : DODGE ROLL      L : ASH GUARD');
+          spawnDelayed('swordTaken');
+        });
+        break;
+      case 'graveCleared':
+        HC.dialogue.start('graveCleared', function () {
+          HC.quest.set('FOLLOW THE GRAVEYARD PATH NORTH');
+        });
+        break;
+      case 'z0Cleared':
+        G.flags.z0Cleared = true;
+        HC.world.setGate('a', true);
+        HC.run.checkpoint = { map: 'graveyard', entry: 'gateA' };
+        HC.dialogue.start('zone0Cleared', function () {
+          HC.quest.set('REACH CANDLEFALL CHAPEL');
+          HC.toast('CHECKPOINT - THE GATE STANDS OPEN');
+        });
+        break;
+      case 'preBoss':
+        HC.dialogue.start('preBoss');
+        break;
+      case 'bossStart':
+        if (!G.boss || G.flags.bossDead) break;
+        HC.world.setGate('b', false);
+        HC.dialogue.start('bossStart', function () {
+          G.boss.activate();
+          HC.audio.setMusic('boss');
+        });
+        break;
+      case 'bossDead':
+        HC.dialogue.start('bossDead', function () {
+          HC.quest.set('REACH CANDLEFALL CHAPEL');
+        });
+        break;
+      case 'toChapel':
+        G.pendingMap = { map: 'chapel', entry: 'fromGraveyard' };
+        break;
+      case 'toGraveyard':
+        G.pendingMap = { map: 'graveyard', entry: 'fromChapel' };
+        break;
+      case 'chapelIntro':
+        HC.dialogue.start('chapelIntro', function () {
+          HC.quest.set('FIND WHO STILL LIVES HERE');
+        });
+        break;
+      case 'brazierLit':
+        G.flags.brazierLit = true;
+        HC.world.setChapelLit();
+        HC.audio.sfx.brazier();
+        HC.audio.setMusic('hub');
+        HC.run.checkpoint = { map: 'chapel', entry: 'fromGraveyard' };
+        HC.camera.shake(2, 0.3);
+        HC.dialogue.start('brazierLit', function () {
+          HC.quest.set('PROLOGUE COMPLETE - REST, OR GROW AT THE SHRINE');
+          G.state = 'end';
+          G.endShown = true;
+        });
+        break;
+    }
+  };
+
+  function spawnDelayed(flag) {
+    var def = HC.maps[G.currentMap];
+    for (var i = 0; i < def.spawns.length; i++) {
+      var s = def.spawns[i];
+      if (s.delayed === flag && HC.ENEMY_DEFS[s.type]) {
+        var e = HC.makeEnemy(s.type, s.x * HC.TILE + 8, s.y * HC.TILE + 8, s.zone);
+        e.rising = 0.9;
+        e.state = 'aggro';
+        G.ents.push(e);
+        HC.audio.sfx.rise();
+      }
+    }
+  }
+
+  G.onEnemyDead = function (e) {
+    HC.run.kills++;
+    if (e.zone === 'boss-add' && G.boss) G.boss.adds = Math.max(0, G.boss.adds - 1);
+    if (e.zone === 'grave' && !G.flags.graveCleared && zoneClear('grave')) {
+      G.flags.graveCleared = true;
+      setTimeout0(function () { G.event('graveCleared'); });
+    }
+    if (e.zone === 'z0' && !G.flags.z0Cleared && zoneClear('z0')) {
+      setTimeout0(function () { G.event('z0Cleared'); });
+    }
+  };
+
+  var delayedCalls = [];
+  function setTimeout0(fn) { delayedCalls.push({ t: 0.8, fn: fn }); }
+
+  function zoneClear(zone) {
+    for (var i = 0; i < G.ents.length; i++) {
+      var e = G.ents[i];
+      if (e.isEnemy && e.zone === zone && e.alive && e.hp > 0) return false;
+    }
+    return true;
+  }
+
+  G.onBossDead = function () {
+    G.flags.bossDead = true;
+    G.boss = null;
+    HC.world.setGate('b', true);
+    HC.world.setGate('d', true);
+    HC.run.checkpoint = { map: 'graveyard', entry: 'arena' };
+    HC.audio.setMusic('ambient');
+    setTimeout0(function () { G.event('bossDead'); });
+  };
+
+  G.onPlayerDeath = function () {
+    HC.run.deaths++;
+    HC.audio.sfx.playerDeath();
+    HC.audio.setMusic('none');
+    HC.camera.shake(5, 0.5);
+    HC.particles.burst(G.player.x, G.player.y - 6, 30, { color: '#f2a13c', spMin: 20, spMax: 100, lifeMax: 1 });
+    G.deathT = 0;
+    G.state = 'dead';
+  };
+
+  G.dropSouls = function (x, y, total) {
+    var n = HC.clamp(Math.round(total / 12), 2, 6);
+    var per = Math.round(total / n);
+    for (var i = 0; i < n; i++) G.ents.push(HC.makeSoulFly(x + HC.rand(-6, 6), y + HC.rand(-10, 2), per));
+  };
+
+  G.addEnt = function (e) { G.ents.push(e); };
+
+  HC.toast = function (text) {
+    HC.floaters.add(HC.camera.x + HC.VIEW_W / 2, HC.camera.y + HC.VIEW_H - 40, text, '#c9bfa4');
+  };
+
+  // ---------- interactables ----------
+  function nearestInteract() {
+    var best = null, bd = 1e9;
+    for (var i = 0; i < G.ents.length; i++) {
+      var e = G.ents[i];
+      if (!e.isInteract) continue;
+      var d = HC.dist(G.player.x, G.player.y, e.x, e.y);
+      if (d < (e.radius || 16) && d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+
+  function useInteract(it) {
+    HC.audio.sfx.interact();
+    if (it.kind === 'sword') {
+      it.alive = false;
+      G.event('swordTaken');
+    } else if (it.kind === 'brazier') {
+      if (!G.flags.brazierLit) { G.event('brazierLit'); it.prompt = 'REST BY THE FLAME'; }
+      else {
+        G.player.hp = G.player.maxHp();
+        G.player.flasks = G.player.maxFlasks;
+        HC.audio.sfx.heal();
+        HC.floaters.add(G.player.x, G.player.y - 16, 'YOU REST BY THE FLAME', '#ffd47a');
+      }
+    } else if (it.kind === 'shrine') {
+      if (!G.flags.shrineSeen) {
+        G.flags.shrineSeen = true;
+        HC.dialogue.start('shrineFirst', function () { G.state = 'upgrade'; G.upgSel = 0; });
+      } else { G.state = 'upgrade'; G.upgSel = 0; }
+    } else if (it.kind === 'survivor') {
+      if (G.flags.brazierLit) HC.dialogue.start('survivorAfter');
+      else if (!G.flags.metCole) {
+        G.flags.metCole = true;
+        HC.dialogue.start('survivor', function () {
+          HC.quest.set('LIGHT THE CHAPEL FLAME');
+        });
+      } else HC.dialogue.start('survivorWaiting');
+    }
+  }
+
+  // ---------- upgrade shrine ----------
+  var UPG = [
+    { key: 'hp', name: 'HEALTH', desc: '+22 MAX HP' },
+    { key: 'st', name: 'STAMINA', desc: '+14 MAX STAMINA' },
+    { key: 'str', name: 'STRENGTH', desc: '+16 PERCENT SWORD DAMAGE' }
+  ];
+  function upgCost(key) { return 40 + HC.run.stats[key] * 35; }
+
+  function updateUpgrade() {
+    if (HC.input.hit('up')) { G.upgSel = (G.upgSel + UPG.length - 1) % UPG.length; HC.audio.sfx.ui(); }
+    if (HC.input.hit('down')) { G.upgSel = (G.upgSel + 1) % UPG.length; HC.audio.sfx.ui(); }
+    if (HC.input.hit('attack') || HC.input.hit('interact')) {
+      var u = UPG[G.upgSel], cost = upgCost(u.key);
+      if (HC.run.souls >= cost) {
+        HC.run.souls -= cost;
+        HC.run.stats[u.key]++;
+        if (u.key === 'hp') G.player.hp = G.player.maxHp();
+        if (u.key === 'st') G.player.st = G.player.maxSt();
+        HC.audio.sfx.buy();
+        HC.particles.burst(G.player.x, G.player.y - 8, 16, { color: '#8fe8ff', spMin: 20, spMax: 70, lifeMax: 0.8 });
+      } else HC.audio.sfx.deny();
+    }
+    if (HC.input.hit('pause') || HC.input.hit('dodge')) { G.state = 'play'; HC.audio.sfx.ui(); }
+  }
+
+  function drawUpgrade() {
+    var W = HC.VIEW_W, H = HC.VIEW_H;
+    ctx.fillStyle = 'rgba(6,8,18,0.8)';
+    ctx.fillRect(0, 0, W, H);
+    var pw = 240, phh = 130, px = W / 2 - pw / 2, py = H / 2 - phh / 2;
+    ctx.fillStyle = 'rgba(16,13,24,0.96)';
+    ctx.fillRect(px, py, pw, phh);
+    ctx.strokeStyle = '#6e563c'; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, phh - 1);
+    HC.font.drawShadow(ctx, 'SHRINE OF REMEMBRANCE', W / 2, py + 8, '#ffd47a', 1, 'center');
+    HC.font.draw(ctx, 'REMEMBRANCE: ' + HC.run.souls, W / 2, py + 20, '#8fe8ff', 1, 'center');
+    for (var i = 0; i < UPG.length; i++) {
+      var u = UPG[i], y = py + 38 + i * 22;
+      var sel = i === G.upgSel;
+      if (sel) {
+        ctx.fillStyle = 'rgba(110,86,60,0.3)';
+        ctx.fillRect(px + 8, y - 3, pw - 16, 18);
+        HC.font.draw(ctx, '>', px + 12, y + 1, '#ffd47a', 1);
+      }
+      var cost = upgCost(u.key);
+      var afford = HC.run.souls >= cost;
+      HC.font.draw(ctx, u.name + ' ' + (HC.run.stats[u.key] > 0 ? '+' + HC.run.stats[u.key] : ''), px + 24, y, sel ? '#e6dfc8' : '#9aa3b2', 1);
+      HC.font.draw(ctx, u.desc, px + 24, y + 8, '#6d7484', 1);
+      HC.font.draw(ctx, String(cost), px + pw - 14, y + 4, afford ? '#8fe8ff' : '#93262e', 1, 'right');
+    }
+    HC.font.draw(ctx, 'J : OFFER      ESC : LEAVE', W / 2, py + phh - 12, '#6d7484', 1, 'center');
+  }
+
+  // ---------- HUD ----------
+  function drawBar(x, y, w, h, frac, fill, back) {
+    ctx.fillStyle = '#0a0c18';
+    ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+    ctx.fillStyle = back;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, y, Math.round(w * HC.clamp(frac, 0, 1)), h);
+    ctx.strokeStyle = 'rgba(110,86,60,0.7)';
+    ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+  }
+
+  function drawHUD() {
+    var p = G.player;
+    if (!p) return;
+    drawBar(8, 8, 70 + HC.run.stats.hp * 8, 5, p.hp / p.maxHp(), '#a4333b', '#2a1114');
+    drawBar(8, 16, 56 + HC.run.stats.st * 6, 4, p.st / p.maxSt(), '#5b7348', '#1a2118');
+    // flasks
+    for (var i = 0; i < p.maxFlasks; i++) {
+      var fx = 9 + i * 8;
+      ctx.fillStyle = i < p.flasks ? '#f2a13c' : '#3a3227';
+      ctx.fillRect(fx, 24, 5, 6);
+      ctx.fillStyle = i < p.flasks ? '#ffd47a' : '#2c2618';
+      ctx.fillRect(fx + 1, 25, 2, 2);
+      ctx.strokeStyle = '#0a0c18';
+      ctx.strokeRect(fx - 0.5, 23.5, 6, 7);
+    }
+    // souls
+    ctx.fillStyle = '#8fe8ff';
+    ctx.fillRect(10, HC.VIEW_H - 14, 3, 3);
+    ctx.fillStyle = 'rgba(143,232,255,0.4)';
+    ctx.fillRect(9, HC.VIEW_H - 15, 5, 5);
+    HC.font.drawShadow(ctx, String(HC.run.souls), 18, HC.VIEW_H - 16, '#8fe8ff', 1);
+
+    HC.quest.draw(ctx);
+
+    // boss bar
+    if (G.boss && G.boss.state !== 'dormant' && G.boss.hp > 0) {
+      var bw = 200, bx = HC.VIEW_W / 2 - bw / 2, by = HC.VIEW_H - 26;
+      HC.font.drawShadow(ctx, G.boss.name, HC.VIEW_W / 2, by - 10, '#e6dfc8', 1, 'center');
+      drawBar(bx, by, bw, 5, G.boss.hp / G.boss.maxHp, '#a4333b', '#211016');
+      ctx.fillStyle = '#d8b455';
+      ctx.fillRect(bx - 3, by - 1, 2, 7);
+      ctx.fillRect(bx + bw + 1, by - 1, 2, 7);
+    }
+
+    // interact prompt
+    if (G.state === 'play' && !HC.dialogue.active) {
+      var it = nearestInteract();
+      if (it) {
+        var sx = Math.round(it.x - HC.camera.ox()), sy = Math.round(it.y - HC.camera.oy() - 24);
+        HC.font.drawShadow(ctx, '(E) ' + it.prompt, sx, sy, '#ffd47a', 1, 'center');
+      }
+    }
+
+    // low hp vignette
+    if (p.hp / p.maxHp() < 0.3 && !p.dead) {
+      var pulse = 0.12 + 0.08 * Math.sin(HC.world.time * 5);
+      ctx.fillStyle = 'rgba(147,38,46,' + pulse + ')';
+      ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    }
+
+    // map banner
+    if (G.mapBannerT > 0 && HC.world.map) {
+      var a = HC.clamp(Math.min(G.mapBannerT, 3 - G.mapBannerT) * 1.5, 0, 1);
+      ctx.globalAlpha = a;
+      HC.font.drawShadow(ctx, HC.world.map.name, HC.VIEW_W / 2, 60, '#e6dfc8', 2, 'center');
+      ctx.fillStyle = '#6e563c';
+      ctx.fillRect(HC.VIEW_W / 2 - 60, 78, 120, 1);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---------- screens ----------
+  function drawTitle() {
+    ctx.fillStyle = '#0a0c1a';
+    ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    // drifting fog
+    HC.world.drawWeather(ctx, 0, 0, 1 / 60);
+    var cw = HC.sprites.crown;
+    ctx.imageSmoothingEnabled = false;
+    var t = G.titleT;
+    var bob = Math.sin(t * 1.2) * 3;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.globalCompositeOperation = 'lighter';
+    var grd = ctx.createRadialGradient(HC.VIEW_W / 2, 74 + bob, 2, HC.VIEW_W / 2, 74 + bob, 60);
+    grd.addColorStop(0, 'rgba(216,180,85,0.35)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(HC.VIEW_W / 2 - 60, 14 + bob, 120, 120);
+    ctx.restore();
+    ctx.drawImage(cw, 0, 0, cw.width, cw.height, Math.round(HC.VIEW_W / 2 - cw.width * 1.5), Math.round(44 + bob), cw.width * 3, cw.height * 3);
+    HC.font.drawShadow(ctx, 'THE HOLLOW CROWN', HC.VIEW_W / 2, 96, '#e6dfc8', 2, 'center');
+    HC.font.draw(ctx, 'PROLOGUE : THE GRAVE WAKES', HC.VIEW_W / 2, 114, '#ffd47a', 1, 'center');
+    HC.font.draw(ctx, 'A DARK FANTASY ACTION RPG', HC.VIEW_W / 2, 126, '#6d7484', 1, 'center');
+    if (Math.floor(t * 1.6) % 2 === 0)
+      HC.font.draw(ctx, 'PRESS ANY KEY', HC.VIEW_W / 2, 152, '#e6dfc8', 1, 'center');
+    HC.font.draw(ctx, 'WASD MOVE  J ATTACK  SPACE DODGE  L GUARD  F EMBER  E INTERACT', HC.VIEW_W / 2, 190, '#4a5166', 1, 'center');
+    HC.font.draw(ctx, 'CLASS : ASH KNIGHT', HC.VIEW_W / 2, 204, '#4a5166', 1, 'center');
+    HC.world.drawVignette(ctx);
+  }
+
+  function drawDead() {
+    G.deathT += 1 / 60;
+    ctx.fillStyle = 'rgba(10,6,10,' + HC.clamp(G.deathT * 1.2, 0, 0.88) + ')';
+    ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    if (G.deathT > 0.8) {
+      HC.font.drawShadow(ctx, 'THE LANTERN PULLS YOU BACK', HC.VIEW_W / 2, HC.VIEW_H / 2 - 10, '#c04a50', 1, 'center');
+      if (G.deathT > 1.6 && Math.floor(G.deathT * 2) % 2 === 0)
+        HC.font.draw(ctx, 'PRESS ANY KEY', HC.VIEW_W / 2, HC.VIEW_H / 2 + 14, '#9aa3b2', 1, 'center');
+    }
+    if (G.deathT > 1.6 && HC.input.hit('any')) {
+      G.loadMap(HC.run.checkpoint.map, HC.run.checkpoint.entry);
+      G.state = 'play';
+      G.fade = 1; G.fadeDir = -1;
+    }
+  }
+
+  function drawEnd() {
+    ctx.fillStyle = 'rgba(6,8,18,0.85)';
+    ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    var pw = 280, phh = 150, px = HC.VIEW_W / 2 - pw / 2, py = HC.VIEW_H / 2 - phh / 2;
+    ctx.fillStyle = 'rgba(14,12,22,0.97)';
+    ctx.fillRect(px, py, pw, phh);
+    ctx.strokeStyle = '#6e563c'; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, phh - 1);
+    var cw = HC.sprites.crown;
+    ctx.drawImage(cw, px + pw / 2 - cw.width / 2, py + 8);
+    HC.font.drawShadow(ctx, 'THE CHAPEL FLAME IS LIT', HC.VIEW_W / 2, py + 26, '#ffd47a', 1, 'center');
+    HC.font.draw(ctx, 'PROLOGUE COMPLETE', HC.VIEW_W / 2, py + 40, '#e6dfc8', 1, 'center');
+    var mins = Math.floor(HC.run.time / 60), secs = Math.floor(HC.run.time % 60);
+    HC.font.draw(ctx, 'TIME ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '   DEATHS ' + HC.run.deaths + '   SLAIN ' + HC.run.kills, HC.VIEW_W / 2, py + 58, '#9aa3b2', 1, 'center');
+    HC.font.draw(ctx, 'NEXT : QUEST 1 - LIGHT THE CHAPEL', HC.VIEW_W / 2, py + 80, '#6d7484', 1, 'center');
+    HC.font.draw(ctx, 'THE BELL TOWER... THE CATACOMBS...', HC.VIEW_W / 2, py + 92, '#6d7484', 1, 'center');
+    HC.font.draw(ctx, 'AND SIR ALRIC, THE KNEELING KNIGHT', HC.VIEW_W / 2, py + 104, '#6d7484', 1, 'center');
+    if (Math.floor(HC.world.time * 1.6) % 2 === 0)
+      HC.font.draw(ctx, 'PRESS ANY KEY TO KEEP EXPLORING', HC.VIEW_W / 2, py + phh - 16, '#e6dfc8', 1, 'center');
+  }
+
+  function drawPause() {
+    ctx.fillStyle = 'rgba(6,8,18,0.75)';
+    ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    HC.font.drawShadow(ctx, 'PAUSED', HC.VIEW_W / 2, 70, '#e6dfc8', 2, 'center');
+    var lines = [
+      'WASD / ARROWS : MOVE',
+      'J / X : ATTACK (CHAIN 3 HITS)',
+      'SPACE / K : DODGE ROLL (I-FRAMES)',
+      'L / SHIFT : ASH GUARD (75 PERCENT REDUCTION)',
+      'F : DRINK EMBER FLASK',
+      'E : INTERACT',
+      'ESC : RESUME'
+    ];
+    for (var i = 0; i < lines.length; i++)
+      HC.font.draw(ctx, lines[i], HC.VIEW_W / 2, 100 + i * 12, '#9aa3b2', 1, 'center');
+  }
+
+  // ---------- world rendering ----------
+  function renderWorld() {
+    var cx = HC.camera.ox(), cy = HC.camera.oy();
+    HC.world.drawGround(ctx, cx, cy);
+
+    var ysorted = [];
+    HC.world.collectDrawables(ctx, cx, cy, ysorted);
+    for (var i = 0; i < G.ents.length; i++) {
+      var e = G.ents[i];
+      if (!e.alive) continue;
+      (function (e) {
+        ysorted.push({ base: e.base ? e.base() : e.y, draw: function (c2) { e.draw(c2, cx, cy); } });
+      })(e);
+    }
+    if (G.player && !G.player.dead)
+      ysorted.push({ base: G.player.base(), draw: function (c2) { G.player.draw(c2, cx, cy); } });
+    ysorted.sort(function (a, b) { return a.base - b.base; });
+    for (var j = 0; j < ysorted.length; j++) ysorted[j].draw(ctx);
+
+    HC.particles.draw(ctx, cx, cy);
+
+    // lights
+    var lights = [];
+    if (G.player && !G.player.dead) lights = lights.concat(G.player.lights());
+    for (var k = 0; k < G.ents.length; k++) {
+      var le = G.ents[k];
+      if (le.alive && le.lights) lights = lights.concat(le.lights());
+    }
+    HC.world.drawLighting(ctx, cx, cy, lights);
+    HC.world.drawWeather(ctx, cx, cy, 1 / 60);
+    HC.floaters.draw(ctx, cx, cy);
+    HC.world.drawVignette(ctx);
+  }
+
+  // ---------- update ----------
+  function update(dt) {
+    HC.audio.update();
+    if (G.state === 'title') {
+      G.titleT += dt;
+      if (HC.input.hit('any')) {
+        HC.audio.ensure();
+        newRun();
+        G.loadMap('graveyard', 'start');
+        G.state = 'play';
+        G.fade = 1; G.fadeDir = -1;
+        if (HC.DEBUG) HC.run.souls = 300;
+      }
+      return;
+    }
+    if (G.state === 'dead') { HC.particles.update(dt); HC.camera.update(dt); return; }
+    if (G.state === 'pause') {
+      if (HC.input.hit('pause')) G.state = 'play';
+      return;
+    }
+    if (G.state === 'upgrade') { updateUpgrade(); return; }
+    if (G.state === 'end') {
+      HC.world.update(dt);
+      HC.particles.update(dt);
+      if (HC.input.hit('any')) G.state = 'play';
+      return;
+    }
+
+    // play / dialogue
+    if (G.hitstop > 0) { G.hitstop -= dt; return; }
+
+    HC.run.time += dt;
+    G.mapBannerT = Math.max(0, G.mapBannerT - dt);
+    HC.world.update(dt);
+    HC.quest.update(dt);
+
+    for (var dc = delayedCalls.length - 1; dc >= 0; dc--) {
+      delayedCalls[dc].t -= dt;
+      if (delayedCalls[dc].t <= 0) { var fn = delayedCalls[dc].fn; delayedCalls.splice(dc, 1); fn(); }
+    }
+
+    if (HC.dialogue.active) {
+      HC.dialogue.update(dt);
+      G.vela.update(dt);
+      HC.particles.update(dt);
+      HC.floaters.update(dt);
+      HC.camera.follow(G.player.x, G.player.y);
+      HC.camera.update(dt);
+      return;
+    }
+
+    if (HC.input.hit('pause')) { G.state = 'pause'; return; }
+
+    if (HC.DEBUG) {
+      if (HC.input.code('Digit1')) { var e1 = HC.world.map.entries.gateA; G.player.x = e1.x * 16; G.player.y = e1.y * 16; }
+      if (HC.input.code('Digit2')) { var e2 = HC.world.map.entries.arena; if (e2) { G.player.x = e2.x * 16; G.player.y = e2.y * 16; } }
+      if (HC.input.code('Digit3')) { G.pendingMap = { map: 'chapel', entry: 'fromGraveyard' }; }
+      if (HC.input.code('KeyG')) { G.player.hp = G.player.maxHp(); HC.run.souls += 200; }
+    }
+
+    G.player.update(dt);
+    for (var i = G.ents.length - 1; i >= 0; i--) {
+      var e = G.ents[i];
+      if (!e.alive) { G.ents.splice(i, 1); continue; }
+      e.update(dt);
+    }
+    HC.particles.update(dt);
+    HC.floaters.update(dt);
+
+    // interact
+    if (HC.input.hit('interact')) {
+      var it = nearestInteract();
+      if (it) useInteract(it);
+    }
+
+    // triggers
+    var trs = HC.world.triggers;
+    for (var t = 0; t < trs.length; t++) {
+      var tr = trs[t];
+      if (tr.fired && tr.once) continue;
+      var p = G.player;
+      if (p.x >= tr.x0 && p.x < tr.x1 && p.y >= tr.y0 && p.y < tr.y1) {
+        if (!tr.once || !tr.fired) {
+          tr.fired = true;
+          G.event(tr.event);
+        }
+      }
+    }
+
+    // map transition
+    if (G.pendingMap) {
+      var pm = G.pendingMap; G.pendingMap = null;
+      G.fade = 1; G.fadeDir = -1;
+      G.loadMap(pm.map, pm.entry);
+    }
+
+    HC.camera.follow(G.player.x, G.player.y);
+    HC.camera.update(dt);
+  }
+
+  // ---------- render ----------
+  function render() {
+    ctx.imageSmoothingEnabled = false;
+    if (G.state === 'title') { drawTitle(); HC.input.endFrame(); return; }
+    renderWorld();
+    drawHUD();
+    if (HC.dialogue.active) HC.dialogue.draw(ctx);
+    if (G.state === 'upgrade') drawUpgrade();
+    if (G.state === 'dead') drawDead();
+    if (G.state === 'end') drawEnd();
+    if (G.state === 'pause') drawPause();
+    if (G.fade > 0) {
+      G.fade = HC.clamp(G.fade + G.fadeDir * 0.02, 0, 1);
+      ctx.fillStyle = 'rgba(5,6,14,' + G.fade + ')';
+      ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    }
+    HC.input.endFrame();
+  }
+
+  // ---------- boot ----------
+  G.init = function () {
+    canvas = document.getElementById('game');
+    canvas.width = HC.VIEW_W;
+    canvas.height = HC.VIEW_H;
+    ctx = canvas.getContext('2d');
+
+    function resize() {
+      var scale = Math.min(window.innerWidth / HC.VIEW_W, window.innerHeight / HC.VIEW_H);
+      if (scale > 2) scale = Math.floor(scale);
+      canvas.style.width = Math.round(HC.VIEW_W * scale) + 'px';
+      canvas.style.height = Math.round(HC.VIEW_H * scale) + 'px';
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    var last = performance.now(), acc = 0, STEP = 1 / 60;
+    function frame(now) {
+      var dtReal = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      acc += dtReal;
+      var n = 0;
+      while (acc >= STEP && n < 4) { update(STEP); acc -= STEP; n++; }
+      render();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  };
+
+  return G;
+})();
+
+window.addEventListener('load', function () { HC.game.init(); });
