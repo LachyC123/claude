@@ -29,7 +29,12 @@ HC.sprites = (function () {
     'H': '#767f9a', // stone light
     'Y': '#d8b455', // gold
     'D': '#33261d', // dark wood
-    'F': '#c9b8a0'  // pale flesh
+    'F': '#c9b8a0', // pale flesh
+    'z': '#a9822f', // bronze mid
+    'Z': '#6e5320', // bronze dark
+    'n': '#e0c06a', // bronze sheen / bright gold
+    'P': '#7a2f6b', // cursed violet
+    'p': '#b354a0'  // cursed violet light
   };
 
   function make(w, h, fn) {
@@ -336,6 +341,107 @@ HC.sprites = (function () {
       '............'
     ]))
   ];
+
+  // ---------- Bell-Ringer Twin (16x22): hooded ringer with a cracked mask and a handbell ----------
+  function twinMap(armUp) {
+    var head = [
+      '.....00000......',
+      '....0CCCCC0.....',
+      '...0CCcccCC0....',
+      '...0CcWWWcC0....',   // pale cracked mask
+      '...0CWWpWWC0....',   // cursed-violet eye slit
+      '...0CWWWWWC0....',
+      '...0CcWWWcC0....',
+      '....0CWWWC0.....',   // chin
+      '....00CCC00.....'
+    ];
+    var bodyDown = [
+      '...0CCCCCCC0....',
+      '..0CCClllCCC0...',
+      '..0CCllllllCC0..',
+      '..0CCllllllCC0.z',   // right hand reaches to the bell chain
+      '..0CClllll0Zznn0',
+      '..0CCClll0Zznnz0',   // bronze bell hanging low
+      '..0CCCCC00zznnZ0',
+      '..0CCCCCC0.ZZZ0.',   // bell mouth
+      '...0CCCCC0..0...'
+    ];
+    var bodyUp = [
+      '..zCCCCCCC0.....',   // bell raised high, arm up
+      'Znn0CClllCCC0...',
+      'znnzCllllllCC0..',
+      'zznnClllll lCC0.'.replace(' ', 'l'),
+      'ZzzZClllllllCC0.',
+      '.ZZ0CCClllllC0..',
+      '...0CCCCCCCCC0..',
+      '...0CCCCCCCC0...',
+      '....0CCCCC0.....'
+    ];
+    var legs = [
+      '...0CC0.0CC0....',
+      '...0CC0.0CC0....',
+      '...0ss0.0ss0....',
+      '....00...00.....'
+    ];
+    return head.concat(armUp ? bodyUp : bodyDown).concat(legs);
+  }
+  S.twin = [fromMap(twinMap(false)), fromMap(twinMap(false))];
+  S.twinRing = fromMap(twinMap(true));
+  S.twinLeft = [flipX(S.twin[0]), flipX(S.twin[1])];
+  S.twinRingLeft = flipX(S.twinRing);
+
+  // ---------- The Great Cursed Bell (30x34): bronze, cracked, violet glow within ----------
+  S.greatBell = function (glow) {
+    return make(30, 40, function (g) {
+      var P = PAL;
+      // support beam
+      g.fillStyle = P['0']; g.fillRect(2, 0, 26, 4);
+      g.fillStyle = P.D; g.fillRect(3, 1, 24, 2);
+      g.fillStyle = P.B; g.fillRect(3, 1, 24, 1);
+      // yoke + mount
+      g.fillStyle = P['0']; g.fillRect(12, 4, 6, 4);
+      g.fillStyle = P.Z; g.fillRect(13, 4, 4, 3);
+      // crown ring
+      g.fillStyle = P['0']; g.fillRect(13, 7, 4, 3);
+      g.fillStyle = P.n; g.fillRect(14, 8, 2, 2);
+      // bell body (trapezoid)
+      for (var y = 0; y < 22; y++) {
+        var half = 4 + Math.floor(y * 0.5);
+        var cxp = 15;
+        g.fillStyle = P['0'];
+        g.fillRect(cxp - half - 1, 10 + y, (half + 1) * 2, 1);
+      }
+      for (var y2 = 0; y2 < 21; y2++) {
+        var half2 = 4 + Math.floor(y2 * 0.5);
+        g.fillStyle = P.z;
+        g.fillRect(15 - half2, 11 + y2, half2 * 2, 1);
+        // left sheen
+        g.fillStyle = P.n;
+        g.fillRect(15 - half2, 11 + y2, Math.max(1, Math.floor(half2 * 0.4)), 1);
+        // right shade
+        g.fillStyle = P.Z;
+        g.fillRect(15 + Math.floor(half2 * 0.4), 11 + y2, Math.ceil(half2 * 0.6), 1);
+      }
+      // mouth / lip
+      g.fillStyle = P['0']; g.fillRect(15 - 15, 32, 30, 3);
+      g.fillStyle = P.Z; g.fillRect(1, 32, 28, 2);
+      g.fillStyle = P.n; g.fillRect(2, 32, 26, 1);
+      // clapper shadow inside
+      g.fillStyle = P.K; g.fillRect(13, 30, 4, 4);
+      // the crack
+      g.fillStyle = P['0'];
+      g.fillRect(18, 13, 1, 4); g.fillRect(19, 16, 1, 5); g.fillRect(18, 20, 1, 6); g.fillRect(19, 25, 1, 5);
+      if (glow) {
+        g.fillStyle = P.p;
+        g.fillRect(18, 14, 1, 3); g.fillRect(19, 17, 1, 4); g.fillRect(18, 21, 1, 5); g.fillRect(19, 26, 1, 4);
+        // rune sigil
+        g.fillStyle = P.P; g.fillRect(12, 18, 6, 6);
+        g.fillStyle = P.p; g.fillRect(14, 18, 2, 6); g.fillRect(12, 20, 6, 2);
+      }
+    });
+  };
+  S.greatBellDim = S.greatBell(false);
+  S.greatBellGlow = S.greatBell(true);
 
   // ---------- Bram the carpenter (13x15) ----------
   S.bram = fromMap([
@@ -795,6 +901,66 @@ HC.sprites = (function () {
     g.fillStyle = PAL['0']; g.fillRect(9, 4, 1, 2);
   });
 
+  // ---------- Bell Tower props ----------
+  S.hangBell = make(12, 18, function (g) {
+    var P = PAL;
+    // rope from ceiling
+    g.fillStyle = P.B; g.fillRect(6, 0, 1, 5);
+    g.fillStyle = P['0']; g.fillRect(5, 4, 3, 2);
+    g.fillStyle = P.n; g.fillRect(6, 5, 1, 1);
+    // bell body
+    for (var y = 0; y < 8; y++) {
+      var half = 2 + Math.floor(y * 0.4);
+      g.fillStyle = P['0']; g.fillRect(6 - half - 1, 6 + y, (half + 1) * 2, 1);
+      g.fillStyle = P.z; g.fillRect(6 - half, 6 + y, half * 2, 1);
+      g.fillStyle = P.n; g.fillRect(6 - half, 6 + y, 1, 1);
+    }
+    g.fillStyle = P['0']; g.fillRect(1, 14, 11, 2);
+    g.fillStyle = P.Z; g.fillRect(2, 14, 9, 1);
+    g.fillStyle = P.K; g.fillRect(5, 13, 2, 2);
+  });
+
+  S.bellRope = make(5, 24, function (g) {
+    var P = PAL;
+    g.fillStyle = P['0'];
+    for (var y = 0; y < 24; y++) {
+      var xo = 1 + Math.round(Math.sin(y * 0.6) * 0.9 + 1);
+      g.fillRect(xo, y, 2, 1);
+    }
+    g.fillStyle = P.b;
+    for (var y2 = 0; y2 < 24; y2++) {
+      var xo2 = 1 + Math.round(Math.sin(y2 * 0.6) * 0.9 + 1);
+      g.fillRect(xo2, y2, 1, 1);
+    }
+  });
+
+  // Map Table: the hub reward for silencing the Bell Tower (§7)
+  S.mapTable = make(28, 20, function (g) {
+    var P = PAL;
+    // legs
+    g.fillStyle = P['0']; g.fillRect(3, 14, 3, 6); g.fillRect(22, 14, 3, 6);
+    g.fillStyle = P.D; g.fillRect(4, 15, 1, 5); g.fillRect(23, 15, 1, 5);
+    // tabletop
+    g.fillStyle = P['0']; g.fillRect(1, 4, 26, 11);
+    g.fillStyle = P.B; g.fillRect(2, 5, 24, 9);
+    g.fillStyle = P.b; g.fillRect(2, 5, 24, 1);
+    // parchment map
+    g.fillStyle = P.W; g.fillRect(4, 6, 20, 7);
+    g.fillStyle = P.w; g.fillRect(4, 12, 20, 1); g.fillRect(23, 6, 1, 7);
+    // drawn coastline / roads
+    g.fillStyle = P.B;
+    g.fillRect(6, 8, 5, 1); g.fillRect(10, 9, 4, 1); g.fillRect(13, 8, 6, 1);
+    g.fillStyle = P.G; g.fillRect(7, 10, 3, 1); g.fillRect(16, 10, 4, 1);
+    // region markers (candle-pin points)
+    g.fillStyle = P.R; g.fillRect(8, 7, 1, 1); g.fillRect(18, 9, 1, 1);
+    g.fillStyle = P.O; g.fillRect(12, 8, 1, 1);
+    g.fillStyle = P.E; g.fillRect(20, 7, 1, 1);
+    // a candle at the corner
+    g.fillStyle = P.W; g.fillRect(24, 3, 2, 3);
+    g.fillStyle = P.o; g.fillRect(24, 2, 2, 1);
+    g.fillStyle = P.y; g.fillRect(24, 1, 1, 1);
+  });
+
   S.herbTable = make(16, 12, function (g) {
     g.fillStyle = PAL['0']; g.fillRect(1, 4, 14, 5);
     g.fillStyle = PAL.b; g.fillRect(2, 5, 12, 3);
@@ -889,6 +1055,36 @@ HC.sprites = (function () {
       if (rng() < 0.6) g.fillRect(0, Math.floor(rng() * 16), 16, 1);
       if (rng() < 0.6) g.fillRect(Math.floor(rng() * 16), 0, 1, 16);
     }, 500 + si));
+  }
+  T.stairs = [];
+  for (var sti = 0; sti < 2; sti++) {
+    T.stairs.push(tile(function (g, rng) {
+      // ascending stone steps (read as climbing when moving north)
+      var bands = ['#2b3040', '#333a4e', '#3d4459', '#2b3040'];
+      for (var b = 0; b < 4; b++) {
+        var y = b * 4;
+        g.fillStyle = bands[b]; g.fillRect(0, y, 16, 4);
+        g.fillStyle = '#1a1e2c'; g.fillRect(0, y, 16, 1); // step shadow
+        g.fillStyle = '#4c5570'; g.fillRect(0, y + 1, 16, 1); // step highlight
+      }
+      g.fillStyle = '#222636';
+      for (var s = 0; s < 6; s++) g.fillRect(Math.floor(rng() * 16), Math.floor(rng() * 16), 1, 1);
+    }, 900 + sti));
+  }
+  T.towerfloor = [];
+  for (var tfi = 0; tfi < 3; tfi++) {
+    T.towerfloor.push(tile(function (g, rng) {
+      speckle(g, 16, 16, '#242a3a', [
+        { color: '#2c3346', density: 0.1 },
+        { color: '#1c2130', density: 0.13 },
+        { color: '#161a26', density: 0.04 }
+      ], rng);
+      // mortar seams between big blocks
+      g.fillStyle = '#191d29';
+      if (rng() < 0.7) g.fillRect(0, (rng() < 0.5 ? 5 : 10), 16, 1);
+      g.fillStyle = '#191d29';
+      if (rng() < 0.5) g.fillRect((rng() < 0.5 ? 7 : 3), 0, 1, 16);
+    }, 950 + tfi));
   }
   T.wall = tile(function (g, rng) {
     g.fillStyle = '#0d0f1e'; g.fillRect(0, 0, 16, 16);

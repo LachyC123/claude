@@ -29,7 +29,8 @@ HC.game = (function () {
       sawVillageEnter: false, sawVillageChoice: false,
       q1Started: false, choiceMade: null, rescueDone: false,
       bramSaved: false, lysaSaved: false, lostSeen: false,
-      hasOil: false, q1Done: false
+      hasOil: false, q1Done: false,
+      q2Started: false, twinsDead: false, mapSeen: false
     };
   }
 
@@ -77,15 +78,27 @@ HC.game = (function () {
     var f = G.flags;
     f.sawIntro = f.swordTaken = f.graveCleared = f.z0Cleared = true;
     f.bossDead = f.sawPreBoss = f.metCole = f.brazierLit = f.shrineSeen = true;
+    f.q1Started = f.rescueDone = f.bramSaved = f.hasOil = f.q1Done = true;
+    f.choiceMade = 'bram';
     HC.run.checkpoint = { map: 'chapel', entry: 'fromGraveyard' };
     G.loadMap('chapel', 'fromGraveyard');
+    G.state = 'play';
+  };
+  G.debugToTower = function () {
+    G.debugToChapel();
+    G.flags.q2Started = true;
+    G.loadMap('belltower', 'fromChapel');
     G.state = 'play';
   };
 
   // one source of truth for the objective tracker, derived from flags
   G.refreshQuest = function () {
     var F = G.flags;
-    if (F.q1Done) HC.quest.set('THE BELL TOWER AWAITS - GROW STRONG');
+    if (F.twinsDead) HC.quest.set('STUDY THE MAP TABLE - NEW ROADS AWAIT');
+    else if (F.q2Started || F.q1Done) {
+      if (G.currentMap === 'belltower') HC.quest.set('CLIMB THE TOWER - SILENCE THE CURSED BELL');
+      else HC.quest.set('ENTER THE BELL TOWER BEHIND THE CHAPEL');
+    }
     else if (F.q1Started) {
       if (F.choiceMade && !F.rescueDone) HC.quest.set(F.choiceMade === 'bram' ? 'DEFEND THE WORKSHOP' : 'DEFEND THE CELLAR');
       else if (F.hasOil) HC.quest.set('RETURN THE OIL TO THE CHAPEL FLAME');
@@ -114,6 +127,14 @@ HC.game = (function () {
         if (G.flags.bossDead) continue;
         G.boss = HC.makeGravekeeper(s.x * HC.TILE + 8, s.y * HC.TILE + 8);
         G.ents.push(G.boss);
+      } else if (s.type === 'belltwins') {
+        if (G.flags.twinsDead) continue;
+        G.boss = HC.makeBellTwins(s.x, s.y);
+        G.ents.push(G.boss);
+        G.ents.push(G.boss.twins[0]);
+        G.ents.push(G.boss.twins[1]);
+      } else if (s.type === 'greatbell') {
+        G.ents.push(HC.makeGreatBell(s.x, s.y));
       } else if (HC.ENEMY_DEFS[s.type]) {
         if (s.delayed && !G.flags[s.delayed]) continue;
         var e = HC.makeEnemy(s.type, s.x * HC.TILE + 8, s.y * HC.TILE + 8, s.zone);
@@ -142,6 +163,7 @@ HC.game = (function () {
         G.ents.push(HC.makeInteractable('lysa', 10, 11));
         HC.world.spawnProp('herbtable', 8, 10);
       }
+      if (G.flags.twinsDead) G.ents.push(HC.makeInteractable('maptable', 20, 13));
     }
 
     G.player = HC.makePlayer(spawn.x, spawn.y);
@@ -164,6 +186,10 @@ HC.game = (function () {
     if (mapId === 'chapel') {
       if (G.flags.brazierLit) HC.world.setChapelLit();
       if (G.flags.metCole || G.flags.brazierLit) markFired('chapelIntro');
+    }
+    if (mapId === 'belltower') {
+      HC.world.map.darkness = 0.82;
+      if (G.flags.twinsDead) { markFired('twinsStart'); markFired('towerMidReached'); }
     }
 
     HC.camera.snap(G.player.x, G.player.y);
@@ -306,6 +332,21 @@ HC.game = (function () {
           G.saveGame();
         });
         break;
+      case 'toChapelFromTower':
+        G.pendingMap = { map: 'chapel', entry: 'fromTower' };
+        break;
+      case 'towerMidReached':
+        HC.dialogue.start('towerMid');
+        G.setCheckpoint('belltower', 'start');
+        break;
+      case 'twinsStart':
+        if (!G.boss || G.flags.twinsDead) break;
+        HC.world.setGate('B', false);
+        HC.dialogue.start('twinsStart', function () {
+          G.boss.activate();
+          HC.audio.setMusic('boss');
+        });
+        break;
     }
   }
 
@@ -403,6 +444,29 @@ HC.game = (function () {
     HC.run.checkpoint = { map: 'graveyard', entry: 'arena' };
     HC.audio.setMusic('ambient');
     setTimeout0(function () { G.event('bossDead'); });
+  };
+
+  G.onTwinsDefeated = function () {
+    G.flags.twinsDead = true;
+    G.boss = null;
+    HC.world.setGate('B', true);
+    HC.audio.setMusic('ambient');
+    HC.audio.sfx.bell();
+    G.setCheckpoint('chapel', 'fromTower');
+    setTimeout0(function () {
+      HC.dialogue.start('twinsDead', function () {
+        G.refreshQuest();
+        var mins = Math.floor(HC.run.time / 60), secs = Math.floor(HC.run.time % 60);
+        G.endInfo = {
+          title: 'THE BELL FALLS SILENT',
+          sub: 'QUEST 2 COMPLETE - THE BELL TOWER',
+          stats: 'TIME ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '   DEATHS ' + HC.run.deaths + '   SLAIN ' + HC.run.kills,
+          lines: ['THE DEAD WILL SLEEP A LITTLE LONGER', 'THE MAP TABLE IS RAISED AT CANDLEFALL', 'NEW ROADS OPEN : BRIARWOOD AND BEYOND']
+        };
+        G.state = 'end';
+        G.saveGame();
+      });
+    });
   };
 
   G.onPlayerDeath = function () {
@@ -505,6 +569,27 @@ HC.game = (function () {
     } else if (it.kind === 'lysa') {
       HC.audio.sfx.interact();
       HC.dialogue.start('lysaHub');
+    } else if (it.kind === 'towerdoor') {
+      if (F.twinsDead) {
+        HC.audio.sfx.interact();
+        G.pendingMap = { map: 'belltower', entry: 'fromChapel' };
+      } else if (F.q1Done) {
+        HC.audio.sfx.interact();
+        if (!F.q2Started) {
+          F.q2Started = true;
+          HC.dialogue.start('q2Start', function () { G.pendingMap = { map: 'belltower', entry: 'fromChapel' }; G.saveGame(); });
+        } else {
+          G.pendingMap = { map: 'belltower', entry: 'fromChapel' };
+        }
+      } else {
+        HC.audio.sfx.deny();
+        HC.floaters.add(G.player.x, G.player.y - 16, 'BARRED WITH RUBBLE', '#9aa3b2');
+      }
+    } else if (it.kind === 'maptable') {
+      HC.audio.sfx.interact();
+      G.mapSel = 0;
+      if (!F.mapSeen) { F.mapSeen = true; HC.dialogue.start('mapTableFirst', function () { G.state = 'map'; }); }
+      else G.state = 'map';
     }
   }
 
@@ -604,6 +689,8 @@ HC.game = (function () {
       ctx.fillStyle = '#d8b455';
       ctx.fillRect(bx - 3, by - 1, 2, 7);
       ctx.fillRect(bx + bw + 1, by - 1, 2, 7);
+      // twin health split marker
+      if (G.boss.twins) { ctx.fillStyle = '#0a0c18'; ctx.fillRect(bx + bw / 2, by, 1, 5); }
     }
 
     // interact prompt
@@ -773,6 +860,51 @@ HC.game = (function () {
       HC.font.draw(ctx, 'PRESS ANY KEY TO CONTINUE', HC.VIEW_W / 2, py + phh - 14, '#e6dfc8', 1, 'center');
   }
 
+  // Map Table: the region board unlocked by clearing the Bell Tower (§7, §8)
+  var REGIONS = [
+    { name: 'CANDLEFALL', theme: 'GRAVEYARDS - BURNED FARMS', status: 'RECLAIMED', color: '#7fe08a' },
+    { name: 'THE BRIARWOOD', theme: 'CURSED FOREST - WITCHES', status: 'THE ROAD OPENS SOON', color: '#8fce7a' },
+    { name: 'IRONMERE', theme: 'MINING PRISON - CHAIN CATHEDRAL', status: 'SEALED', color: '#6d7484' },
+    { name: 'THE DROWNED COAST', theme: 'FLOODED TOWNS - GHOST SHIPS', status: 'SEALED', color: '#6d7484' },
+    { name: 'SOLMIRE', theme: 'THE GOLDEN PALACE - THE CROWN', status: 'SEALED', color: '#93262e' }
+  ];
+  function updateMap() {
+    if (HC.input.hit('up')) { G.mapSel = (G.mapSel + REGIONS.length - 1) % REGIONS.length; HC.audio.sfx.ui(); }
+    if (HC.input.hit('down')) { G.mapSel = (G.mapSel + 1) % REGIONS.length; HC.audio.sfx.ui(); }
+    if (HC.input.hit('attack') || HC.input.hit('interact')) {
+      var r = REGIONS[G.mapSel];
+      if (r.status === 'RECLAIMED') { HC.audio.sfx.ui(); HC.toast('CANDLEFALL IS ALREADY YOURS'); }
+      else HC.audio.sfx.deny();
+    }
+    if (HC.input.hit('pause') || HC.input.hit('dodge')) { G.state = 'play'; HC.audio.sfx.ui(); }
+  }
+  function drawMap() {
+    ctx.fillStyle = 'rgba(6,8,18,0.85)';
+    ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
+    var pw = 320, phh = 176, px = HC.VIEW_W / 2 - pw / 2, py = HC.VIEW_H / 2 - phh / 2;
+    ctx.fillStyle = 'rgba(20,17,12,0.98)';
+    ctx.fillRect(px, py, pw, phh);
+    ctx.strokeStyle = '#6e563c'; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, phh - 1);
+    ctx.strokeStyle = 'rgba(110,86,60,0.4)'; ctx.strokeRect(px + 2.5, py + 2.5, pw - 5, phh - 5);
+    HC.font.drawShadow(ctx, 'THE KINGDOM OF VEYR', HC.VIEW_W / 2, py + 8, '#e0c06a', 1, 'center');
+    HC.font.draw(ctx, 'CANDLEFALL WAR TABLE', HC.VIEW_W / 2, py + 20, '#8a7d5a', 1, 'center');
+    for (var i = 0; i < REGIONS.length; i++) {
+      var r = REGIONS[i], y = py + 38 + i * 24, sel = i === G.mapSel;
+      if (sel) {
+        ctx.fillStyle = 'rgba(110,86,60,0.28)';
+        ctx.fillRect(px + 8, y - 3, pw - 16, 21);
+        HC.font.draw(ctx, '>', px + 12, y + 3, '#ffd47a', 1);
+      }
+      // pin marker
+      ctx.fillStyle = r.color;
+      ctx.fillRect(px + 22, y + 2, 3, 3);
+      HC.font.draw(ctx, r.name, px + 30, y, sel ? '#e6dfc8' : '#9aa3b2', 1);
+      HC.font.draw(ctx, r.theme, px + 30, y + 9, '#5c6377', 1);
+      HC.font.draw(ctx, r.status, px + pw - 14, y + 4, r.color, 1, 'right');
+    }
+    HC.font.draw(ctx, 'ESC : STEP AWAY FROM THE TABLE', HC.VIEW_W / 2, py + phh - 12, '#6d7484', 1, 'center');
+  }
+
   function drawPause() {
     ctx.fillStyle = 'rgba(6,8,18,0.75)';
     ctx.fillRect(0, 0, HC.VIEW_W, HC.VIEW_H);
@@ -856,6 +988,7 @@ HC.game = (function () {
       return;
     }
     if (G.state === 'upgrade') { updateUpgrade(); return; }
+    if (G.state === 'map') { updateMap(); return; }
     if (G.state === 'end') {
       HC.world.update(dt);
       HC.particles.update(dt);
@@ -944,6 +1077,7 @@ HC.game = (function () {
     drawHUD();
     if (HC.dialogue.active) HC.dialogue.draw(ctx);
     if (G.state === 'upgrade') drawUpgrade();
+    if (G.state === 'map') drawMap();
     if (G.state === 'dead') drawDead();
     if (G.state === 'end') drawEnd();
     if (G.state === 'pause') drawPause();

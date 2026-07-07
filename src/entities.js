@@ -630,6 +630,209 @@ HC.makeGravekeeper = function (x, y) {
   return B;
 };
 
+// ---------- The Bell-Ringer Twins (mini-boss) ----------
+// Two linked ringers. Alone each is manageable; together their rings overlap. Kill one and
+// the survivor enrages with grief, tolling faster to wake a sibling who will not answer.
+HC.makeBellTwins = function (tx, ty) {
+  var TW_HP = 130;
+
+  function makeTwin(id, x, y, ctrl) {
+    var T = {
+      kind: 'twin', isEnemy: true, isBossPart: true, zone: 'twins',
+      id: id, ctrl: ctrl, x: x, y: y, r: 6, hp: TW_HP, maxHp: TW_HP,
+      state: 'dormant', t: 0, anim: id * 0.5, flash: 0, kx: 0, ky: 0,
+      faceLeft: id === 1, enraged: false,
+      cdSwing: HC.rand(0.5, 1.2), cdRing: 2.5 + id * 1.4, alive: true
+    };
+    T.hurt = function (dmg, sx, sy, heavy) {
+      if (T.hp <= 0 || T.state === 'dormant') return;
+      T.hp -= dmg;
+      T.flash = 0.1;
+      HC.floaters.add(T.x, T.y - 26, Math.round(dmg), heavy ? '#ffd47a' : '#e6dfc8');
+      HC.audio.sfx[heavy ? 'hitCrit' : 'hit']();
+      HC.particles.burst(T.x, T.y - 10, 7, { color: '#343c63', spMin: 30, spMax: 80, lifeMax: 0.5 });
+      var ang = HC.angTo(sx, sy, T.x, T.y);
+      var kb = heavy ? 70 : 40;
+      T.kx += Math.cos(ang) * kb; T.ky += Math.sin(ang) * kb;
+      if (T.hp <= 0) T.die();
+    };
+    T.die = function () {
+      T.alive = false;
+      HC.audio.sfx.bossDeath();
+      HC.camera.shake(4, 0.6);
+      HC.particles.burst(T.x, T.y - 12, 34, { color: '#b354a0', spMin: 20, spMax: 110, lifeMax: 1.1 });
+      HC.particles.burst(T.x, T.y - 12, 18, { color: '#8fe8ff', spMin: 10, spMax: 80, lifeMax: 0.9 });
+      HC.game.dropSouls(T.x, T.y, 80);
+      ctrl.onTwinDown(T);
+    };
+    T.ring = function () {
+      HC.audio.sfx.bell();
+      HC.camera.shake(2.5, 0.3);
+      HC.particles.burst(T.x, T.y - 6, 10, { color: '#b354a0', spMin: 20, spMax: 60, lifeMax: 0.5, glow: 1 });
+      HC.game.addEnt(HC.makeShockwave(T.x, T.y, T.enraged ? 18 : 14));
+    };
+    T.update = function (dt) {
+      var p = HC.game.player;
+      T.anim += dt;
+      T.flash = Math.max(0, T.flash - dt);
+      T.kx *= Math.pow(0.002, dt); T.ky *= Math.pow(0.002, dt);
+      HC.world.moveEnt(T, T.kx * dt, T.ky * dt);
+      if (T.state === 'dormant') return;
+      var d = HC.dist(T.x, T.y, p.x, p.y);
+      T.faceLeft = p.x < T.x;
+      T.cdSwing = Math.max(0, T.cdSwing - dt);
+      T.cdRing = Math.max(0, T.cdRing - dt);
+      var spd = T.enraged ? 44 : 30;
+
+      // separation from sibling
+      var sib = ctrl.twins[1 - T.id];
+      if (sib && sib.alive && sib.hp > 0) {
+        var sd = HC.dist(T.x, T.y, sib.x, sib.y);
+        if (sd < 22 && sd > 0.01) {
+          var sa = HC.angTo(sib.x, sib.y, T.x, T.y);
+          HC.world.moveEnt(T, Math.cos(sa) * 24 * dt, Math.sin(sa) * 24 * dt);
+        }
+      }
+
+      switch (T.state) {
+        case 'intro':
+          T.t += dt;
+          if (T.t > 0.8 + T.id * 0.3) { T.state = 'walk'; T.t = 0; }
+          break;
+        case 'walk': {
+          if (p.dead) break;
+          var a = HC.angTo(T.x, T.y, p.x, p.y);
+          if (d > 34) HC.world.moveEnt(T, Math.cos(a) * spd * dt, Math.sin(a) * spd * dt);
+          else if (d < 26) HC.world.moveEnt(T, -Math.cos(a) * spd * 0.6 * dt, -Math.sin(a) * spd * 0.6 * dt);
+          if (d < 40 && T.cdSwing <= 0) { T.state = 'windupSwing'; T.t = 0; }
+          else if (T.cdRing <= 0 && d < 170) { T.state = 'windupRing'; T.t = 0; }
+          break;
+        }
+        case 'windupSwing':
+          T.t += dt;
+          if (T.t >= (T.enraged ? 0.34 : 0.46)) {
+            T.t = 0; T.state = 'swing'; T.swung = false;
+            T.swingAng = HC.angTo(T.x, T.y, p.x, p.y);
+          }
+          break;
+        case 'swing':
+          T.t += dt;
+          HC.world.moveEnt(T, Math.cos(T.swingAng) * 70 * dt, Math.sin(T.swingAng) * 70 * dt);
+          if (!T.swung && T.t >= 0.07) {
+            T.swung = true;
+            HC.audio.sfx.slam();
+            var dd = HC.dist(T.x, T.y, p.x, p.y);
+            var da = Math.abs(HC.angDiff(T.swingAng, HC.angTo(T.x, T.y, p.x, p.y)));
+            if (dd < 34 && (dd < 12 || da < 1.4)) p.hurt(T.enraged ? 22 : 18, T.x, T.y);
+            HC.particles.burst(T.x + Math.cos(T.swingAng) * 16, T.y + Math.sin(T.swingAng) * 16, 8, { color: '#a9822f', spMin: 20, spMax: 70, lifeMax: 0.4 });
+          }
+          if (T.t >= 0.26) { T.state = 'recover'; T.t = 0; T.cdSwing = T.enraged ? 0.9 : 1.6; }
+          break;
+        case 'windupRing':
+          T.t += dt;
+          if (T.t >= (T.enraged ? 0.6 : 0.8)) {
+            T.t = 0; T.state = 'recover'; T.ring();
+            T.cdRing = T.enraged ? 2.2 : 4.5;
+          }
+          break;
+        case 'recover':
+          T.t += dt;
+          if (T.t >= (T.enraged ? 0.35 : 0.6)) { T.state = 'walk'; T.t = 0; }
+          break;
+      }
+    };
+    T.base = function () { return T.y + 10; };
+    T.draw = function (ctx, cx, cy) {
+      var ringing = T.state === 'windupRing';
+      var img = ringing ? (T.faceLeft ? HC.sprites.twinRingLeft : HC.sprites.twinRing)
+                        : (T.faceLeft ? HC.sprites.twinLeft[0] : HC.sprites.twin[0]);
+      var px = Math.round(T.x - cx - img.width / 2), py = Math.round(T.y - cy - img.height + 10);
+      ctx.fillStyle = 'rgba(5,7,15,0.45)';
+      ctx.fillRect(px + 4, Math.round(T.y - cy + 3), img.width - 8, 3);
+      ctx.drawImage(img, px, py);
+      // enrage / windup tint
+      if (T.flash > 0 || ringing || T.enraged) {
+        var a = ringing ? 0.3 + 0.25 * Math.sin(T.anim * 26) : T.flash > 0 ? T.flash * 6 : 0.18 + 0.1 * Math.sin(T.anim * 8);
+        ctx.globalAlpha = a;
+        ctx.globalCompositeOperation = 'lighter';
+        // recolor via tinted rect over sprite silhouette
+        ctx.drawImage(img, px, py);
+        if (T.enraged) { ctx.fillStyle = 'rgba(179,84,160,0.5)'; ctx.fillRect(px + 3, py + 2, img.width - 6, 10); }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+      if (T.state === 'swing') {
+        ctx.save();
+        ctx.translate(Math.round(T.x - cx), Math.round(T.y - cy - 6));
+        ctx.rotate(T.swingAng);
+        var tt = Math.min(1, T.t / 0.26);
+        ctx.strokeStyle = 'rgba(224,192,106,' + (0.8 - tt * 0.6) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, -1.0 + 2.0 * tt * 0.5, -1.0 + 2.0 * (0.4 + tt * 0.6));
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    T.lights = function () {
+      return [{ x: T.x, y: T.y - 6, r: T.enraged ? 26 : 18, warm: !T.enraged, violet: T.enraged, flicker: 1 }];
+    };
+    return T;
+  }
+
+  var cx0 = tx * HC.TILE + 8, cy0 = ty * HC.TILE + 8;
+  var ctrl = {
+    kind: 'twinctrl', isBoss: true, name: 'THE BELL-RINGER TWINS',
+    maxHp: TW_HP * 2, hp: TW_HP * 2, state: 'dormant',
+    twins: [], resonanceCD: 9, alive: true, done: false
+  };
+  ctrl.twins = [
+    makeTwin(0, cx0 - 26, cy0, ctrl),
+    makeTwin(1, cx0 + 26, cy0, ctrl)
+  ];
+  ctrl.activate = function () {
+    if (ctrl.state !== 'dormant') return;
+    ctrl.state = 'active';
+    HC.audio.sfx.roar();
+    for (var i = 0; i < ctrl.twins.length; i++) { ctrl.twins[i].state = 'intro'; ctrl.twins[i].t = 0; }
+  };
+  ctrl.onTwinDown = function (dead) {
+    var other = ctrl.twins[1 - dead.id];
+    if (other && other.alive && other.hp > 0) {
+      other.enraged = true;
+      other.cdRing = Math.min(other.cdRing, 1.2);
+      HC.floaters.add(other.x, other.y - 30, 'GRIEF!', '#b354a0');
+      HC.camera.shake(3, 0.4);
+      HC.audio.sfx.rise();
+    }
+  };
+  ctrl.update = function (dt) {
+    if (ctrl.state === 'dormant' || ctrl.done) return;
+    var a0 = ctrl.twins[0].alive && ctrl.twins[0].hp > 0;
+    var a1 = ctrl.twins[1].alive && ctrl.twins[1].hp > 0;
+    ctrl.hp = (a0 ? ctrl.twins[0].hp : 0) + (a1 ? ctrl.twins[1].hp : 0);
+    // resonance: both toll together for an overlapping double wave
+    if (a0 && a1) {
+      ctrl.resonanceCD -= dt;
+      if (ctrl.resonanceCD <= 0) {
+        ctrl.resonanceCD = 10;
+        for (var i = 0; i < 2; i++) {
+          var tw = ctrl.twins[i];
+          if (tw.state === 'walk' || tw.state === 'recover') { tw.state = 'windupRing'; tw.t = 0; }
+        }
+      }
+    }
+    if (!a0 && !a1) {
+      ctrl.done = true; ctrl.alive = false; ctrl.state = 'over';
+      HC.game.onTwinsDefeated();
+    }
+  };
+  ctrl.base = function () { return -99999; };
+  ctrl.draw = function () { };
+  ctrl.hurt = function () { };
+  return ctrl;
+};
+
 // ---------- projectiles / shockwave ----------
 HC.makeArrow = function (x, y, vx, vy, dmg) {
   var A = { kind: 'arrow', x: x, y: y, vx: vx, vy: vy, t: 0, alive: true };
@@ -820,6 +1023,12 @@ HC.makeInteractable = function (type, tx, ty) {
   }
   if (type === 'bram') { I.prompt = 'SPEAK'; I.radius = 22; }
   if (type === 'lysa') { I.prompt = 'SPEAK'; I.radius = 22; }
+  if (type === 'towerdoor') {
+    I.prompt = F.q1Done ? 'CLIMB THE BELL TOWER' : 'THE TOWER STAIR IS CHOKED WITH RUBBLE';
+    if (F.twinsDead) I.prompt = 'THE SILENT BELFRY';
+    I.radius = 22;
+  }
+  if (type === 'maptable') { I.prompt = 'STUDY THE MAP TABLE'; I.radius = 24; I.solid = true; }
 
   if (I.solid) {
     HC.world.props.push({ type: type + '-block', x: I.x - 6, y: I.y - 4, solid: { x: I.x - 6, y: I.y - 4, w: 12, h: 10 }, base: -1, img: null, draw: null });
@@ -852,6 +1061,22 @@ HC.makeInteractable = function (type, tx, ty) {
       ctx.drawImage(S.bram, px - 6, py - 11);
     } else if (type === 'lysa') {
       ctx.drawImage(S.lysa, px - 6, py - 11);
+    } else if (type === 'towerdoor') {
+      // a dark arched stair cut into the chapel base, faint warm light within
+      ctx.fillStyle = '#05060d';
+      ctx.fillRect(px - 6, py - 16, 12, 18);
+      ctx.fillStyle = '#0d0f1e';
+      ctx.fillRect(px - 7, py - 18, 14, 3);
+      ctx.fillRect(px - 7, py - 18, 2, 20); ctx.fillRect(px + 5, py - 18, 2, 20);
+      var gl = 0.12 + 0.06 * Math.sin(I.t * 3);
+      if (!HC.game.flags.twinsDead) {
+        ctx.fillStyle = 'rgba(255,170,70,' + gl + ')';
+        ctx.fillRect(px - 4, py - 12, 8, 12);
+        ctx.fillStyle = 'rgba(255,212,122,' + (gl * 0.7) + ')';
+        ctx.fillRect(px - 2, py - 6, 4, 6);
+      }
+    } else if (type === 'maptable') {
+      ctx.drawImage(S.mapTable, px - 14, py - 16);
     }
     // bramDoor / lysaDoor draw nothing: the house and cellar props carry the visuals
   };
@@ -863,7 +1088,38 @@ HC.makeInteractable = function (type, tx, ty) {
     if (type === 'shrine') return [{ x: I.x - 5, y: I.y - 4, r: 20, warm: 1, flicker: 1 }, { x: I.x + 4, y: I.y - 5, r: 20, warm: 1, flicker: 1 }];
     if (type === 'sword') return [{ x: I.x, y: I.y - 4, r: 18, warm: 0, flicker: 1 }];
     if (type === 'oil') return [{ x: I.x, y: I.y - 4, r: 18, warm: 1, flicker: 1 }];
+    if (type === 'towerdoor' && !HC.game.flags.twinsDead) return [{ x: I.x, y: I.y - 8, r: 24, warm: 1, flicker: 1 }];
+    if (type === 'maptable') return [{ x: I.x, y: I.y - 6, r: 26, warm: 1, flicker: 1 }];
     return [];
   };
   return I;
+};
+
+// The Great Cursed Bell — passive belfry centerpiece: glows and tolls while the twins live,
+// cracks silent when they fall. Blocks movement (registers a solid footprint).
+HC.makeGreatBell = function (tx, ty) {
+  var B = {
+    kind: 'greatbell', x: tx * HC.TILE + 8, y: ty * HC.TILE + 8,
+    t: 0, tollT: 0, silenced: false, alive: true
+  };
+  // solid footprint so the fight circles it
+  HC.world.props.push({ x: B.x - 10, y: B.y - 2, solid: { x: B.x - 10, y: B.y - 2, w: 20, h: 12 }, base: -1, img: null });
+  B.update = function (dt) {
+    B.t += dt;
+    if (HC.game.flags.twinsDead) B.silenced = true;
+    if (!B.silenced && Math.random() < dt * 5)
+      HC.particles.spawn({ x: B.x + HC.rand(-8, 8), y: B.y + HC.rand(-4, 10), vx: HC.rand(-6, 6), vy: HC.rand(-18, -4), life: 0.8, color: Math.random() < 0.5 ? '#b354a0' : '#7a2f6b', size: 1, glow: 1 });
+  };
+  B.base = function () { return B.y + 24; };
+  B.draw = function (ctx, cx, cy) {
+    var img = B.silenced ? HC.sprites.greatBellDim : HC.sprites.greatBellGlow;
+    var sway = B.silenced ? 0 : Math.sin(B.t * 2.2) * 1.5;
+    ctx.drawImage(img, Math.round(B.x - cx - img.width / 2 + sway), Math.round(B.y - cy - 20));
+  };
+  B.lights = function () {
+    if (B.silenced) return [{ x: B.x, y: B.y, r: 22, warm: 0, flicker: 1 }];
+    var pulse = 22 + Math.sin(B.t * 3) * 5;
+    return [{ x: B.x, y: B.y + 4, r: pulse, warm: 0, flicker: 1, violet: true }];
+  };
+  return B;
 };

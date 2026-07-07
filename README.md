@@ -24,8 +24,9 @@ Add `?debug` to the URL for dev keys: `1`/`2` teleport, `3` jump to chapel, `G` 
 
 ## What's in the slice
 
-This implements **Milestones 0–9** of the plan's build roadmap (§16), covering the Prologue
-(§9, "The Grave Wakes") **and Quest 1** ("Light the Chapel") with its signature moral choice:
+This implements **Milestones 0–10** of the plan's build roadmap (§16), covering the Prologue
+(§9, "The Grave Wakes"), **Quest 1** ("Light the Chapel") with its signature moral choice, and
+**Quest 2** ("The Bell Tower") with a two-body mini-boss:
 
 - **Combat prototype** — stamina-based melee with combos, dodge i-frames, guard, knockback,
   hit-stop, screen shake, damage numbers (Milestone 0)
@@ -46,8 +47,15 @@ This implements **Milestones 0–9** of the plan's build roadmap (§16), coverin
   objective, and the **save-Bram-or-Lysa choice** (§13): whoever you answer first lives and
   joins the hub, the other is lost. Each survivor grants a distinct permanent perk — Bram
   reinforces the Ash Guard, Lysa deepens and adds an ember flask (Milestone 8)
+- **Quest 2: The Bell Tower** — a vertical **climb** up the ruined belfry (stair shafts, combat
+  chambers, hanging bells) under fire from cultists, to the **Bell-Ringer Twins** mini-boss:
+  two linked ringers with bell-hammer swings and overlapping sound-shockwave rings. Alone each is
+  manageable; together their rings sync into "resonance" waves. Kill one and the survivor
+  **enrages with grief**, tolling faster. Silencing the great cursed bell **raises the Map Table**
+  in the hub — a war board of all five regions of Veyr (§8), with the Briarwood teased next
 - **Quest & dialogue system** — flag-driven objective tracker, portrait dialogue with Vela / Cole /
-  the Gravekeeper / Bram / Lysa, triggers, multi-map flow, per-chapter end screens, title menu
+  the Gravekeeper / Bram / Lysa / the Twins, triggers, multi-map flow, per-chapter end screens,
+  title menu, and a region-select war table
 
 ## Architecture (how the full game grows from here)
 
@@ -64,22 +72,26 @@ src/game.js      state machine (title/play/dialogue/upgrade/dead/end/pause) · e
 
 Everything expansion-shaped is **data, not code**:
 
-- **New enemy family** → add a row to `HC.ENEMY_DEFS` and a sprite (§11's enemy table maps 1:1)
+- **New enemy family** → add a row to `HC.ENEMY_DEFS` and a sprite (§11's enemy table maps 1:1);
+  the Bell Cultist's homing `bolt` flag shows how to vary the ranged attack
 - **New region** (Briarwood, Ironmere…) → add a map def to `HC.maps`: rows built with the
   alignment-safe `HC.row('26:,','4:p','14:,')` builder, plus coordinate lists for props, spawns,
-  gates, and triggers (Milestone 10)
-- **New quest beat** → a trigger rect + a script entry in `HC.script` + an event case
-- **New boss** → follow `makeGravekeeper`'s state-machine pattern (Sir Alric next, per §17)
-- **Hub growth stages** → `world.setChapelLit()` shows the pattern: swap sprites, add lights,
-  lower darkness, change music
+  gates, and triggers. The Bell Tower shows a **vertical climb** map; the Map Table's `REGIONS`
+  list is already wired to point at the next ones (Milestone 10)
+- **New quest beat** → a trigger rect + a script entry in `HC.script` + an event case; objective
+  text lives in one flag-driven `refreshQuest()` so state survives save/reload
+- **New boss** → `makeGravekeeper` shows a single-body state machine; `makeBellTwins` shows a
+  **multi-body controller** (shared health bar, coordinated attacks, enrage-on-death). Sir Alric next, per §17
+- **Hub growth stages** → `world.setChapelLit()` and the Bell Tower's Map-Table reward show the
+  pattern: swap sprites, add lights, lower darkness, change music, gate new content on a flag
 
 ## Next milestones (from the plan doc)
 
-1. **The Bell Tower** — climb the ruined tower, silence the cursed bell, Bell-Ringer Twins mini-boss
-2. **Chapel Catacombs** — first real dungeon: shortcuts, traps, elite enemy (Milestone 5)
-3. **Sir Alric the Kneeling Knight** — first shard of the Mourning Blade (§9 Quest 3)
-4. Full companion system with bond conversations (Mara Vey), character creation, menu polish
-5. **The Briarwood** — second region, proving the map system scales (Milestone 10)
+1. **Chapel Catacombs** — first proper dungeon: shortcuts, traps, elite enemy (Milestone 5)
+2. **Sir Alric the Kneeling Knight** — first shard of the Mourning Blade (§9 Quest 3)
+3. Full companion system with bond conversations (Mara Vey), character creation, menu polish
+4. **The Briarwood** — second full region off the Map Table, proving the world scales (Milestone 10)
+5. Ironmere, the Drowned Coast, Solmire — the remaining Map-Table roads
 
 *Build in small, finished passes. Do not build every region at once.* — the plan's final rule,
 and this codebase's too.

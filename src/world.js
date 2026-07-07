@@ -118,6 +118,7 @@ HC.maps = (function () {
     entries: {
       fromGraveyard: { x: 16.5, y: 27, face: 'up' },
       fromVillage: { x: 1.5, y: 21, face: 'right' },
+      fromTower: { x: 16.5, y: 8, face: 'down' },
       start: { x: 16.5, y: 27, face: 'up' }
     },
     props: [
@@ -132,7 +133,8 @@ HC.maps = (function () {
     spawns: [
       { type: 'brazier', x: 16, y: 11 },
       { type: 'shrine', x: 23, y: 9 },
-      { type: 'survivor', x: 13, y: 8 }
+      { type: 'survivor', x: 13, y: 8 },
+      { type: 'towerdoor', x: 16, y: 7 }
     ],
     gates: {},
     triggers: [
@@ -203,7 +205,71 @@ HC.maps = (function () {
     ]
   };
 
-  return { graveyard: graveyard, chapel: chapel, village: village };
+  // ---------- The Bell Tower: 24 x 62, climbed from bottom (entrance) to top (belfry) ----------
+  var b = [];
+  b.push(R('24:#'));                                                  // 0 roof
+  b.push(R('24:#'));                                                  // 1
+  for (var b2 = 2; b2 <= 14; b2++)
+    b.push(R('2:#', '20:t', '2:#'));                                  // 2-14 belfry (boss arena)
+  b.push(R('2:#', '20:t', '2:#'));                                    // 15 belfry floor
+  b.push(R('10:#', '4:B', '10:#'));                                   // 16 belfry gate (funnel)
+  for (var b17 = 17; b17 <= 26; b17++)
+    b.push(R('7:#', '10:S', '7:#'));                                  // 17-26 upper stair shaft
+  b.push(R('7:#', '10:t', '7:#'));                                    // 27 landing
+  for (var b28 = 28; b28 <= 37; b28++)
+    b.push(R('3:#', '18:t', '3:#'));                                  // 28-37 mid chamber
+  b.push(R('3:#', '18:t', '3:#'));                                    // 38 mid floor
+  for (var b39 = 39; b39 <= 47; b39++)
+    b.push(R('7:#', '10:S', '7:#'));                                  // 39-47 lower stair shaft
+  b.push(R('7:#', '10:t', '7:#'));                                    // 48 landing
+  for (var b49 = 49; b49 <= 58; b49++)
+    b.push(R('3:#', '18:t', '3:#'));                                  // 49-58 entrance chamber
+  b.push(R('3:#', '18:t', '3:#'));                                    // 59 entrance floor (exit trigger row)
+  b.push(R('24:#'));                                                  // 60
+  b.push(R('24:#'));                                                  // 61
+
+  var belltower = {
+    id: 'belltower',
+    name: 'THE BELL TOWER',
+    grid: b,
+    darkness: 0.82,
+    music: 'ambient',
+    rain: false,
+    entries: {
+      fromChapel: { x: 12, y: 57, face: 'up' },
+      start: { x: 12, y: 57, face: 'up' },
+      belfry: { x: 12, y: 19, face: 'up' }
+    },
+    props: [
+      { type: 'candles', at: [[3, 12], [20, 12], [4, 30], [19, 34], [8, 49], [16, 55], [3, 50], [20, 52]] },
+      { type: 'hangbell', at: [[4, 6], [19, 8], [5, 31], [18, 30]] },
+      { type: 'bellrope', at: [[7, 5], [16, 5], [9, 29], [14, 29]] },
+      { type: 'skulls', at: [[10, 53], [14, 36]] },
+      { type: 'tomb', at: [[4, 55], [19, 56]] }
+    ],
+    spawns: [
+      { type: 'greatbell', x: 12, y: 6 },
+      { type: 'belltwins', x: 12, y: 11 },
+      { type: 'cultist', x: 7, y: 31, zone: 'mid' },
+      { type: 'cultist', x: 16, y: 34, zone: 'mid' },
+      { type: 'hollow', x: 11, y: 30, zone: 'mid' },
+      { type: 'archer', x: 12, y: 36, zone: 'mid' },
+      { type: 'cultist', x: 8, y: 52, zone: 'low' },
+      { type: 'hollow', x: 15, y: 54, zone: 'low' },
+      { type: 'hollow', x: 10, y: 50, zone: 'low' },
+      { type: 'ember', x: 12, y: 27 },
+      { type: 'ember', x: 12, y: 48 },
+      { type: 'wisp', x: 4, y: 13 }, { type: 'wisp', x: 19, y: 13 }
+    ],
+    gates: { B: { open: true } },
+    triggers: [
+      { x0: 9, y0: 58, x1: 14, y1: 59, event: 'toChapelFromTower' },
+      { x0: 5, y0: 28, x1: 18, y1: 31, event: 'towerMidReached', once: true },
+      { x0: 4, y0: 12, x1: 19, y1: 14, event: 'twinsStart', once: true }
+    ]
+  };
+
+  return { graveyard: graveyard, chapel: chapel, village: village, belltower: belltower };
 })();
 
 // ---------- world runtime ----------
@@ -218,7 +284,7 @@ HC.world = (function () {
   var SOLID_TILES = { '#': 1, 'F': 1 };
   var GROUND = {
     '.': 'grass', ',': 'darkgrass', 'p': 'path', 'm': 'mud', 'f': 'stonefloor',
-    'a': 'ash', 'x': 'charfloor',
+    'a': 'ash', 'x': 'charfloor', 't': 'towerfloor', 'S': 'stairs',
     '#': 'wall', 'F': 'grass', 'A': 'path', 'B': 'grass', 'D': 'path'
   };
 
@@ -342,6 +408,15 @@ HC.world = (function () {
         p.ox = 0; p.oy = 4;
         p.base = p.y + 16;
         p.solid = { x: p.x + 1, y: p.y + 8, w: 14, h: 7 };
+      } else if (type === 'hangbell') {
+        p.img = S.hangBell;
+        p.ox = 2; p.oy = -14;
+        p.base = p.y + 4;
+        p.light = { x: p.x + 8, y: p.y - 6, r: 16, warm: 1, flicker: 1 };
+      } else if (type === 'bellrope') {
+        p.img = S.bellRope;
+        p.ox = 6; p.oy = -22;
+        p.base = 0;
       }
       if (p.light) W.lights.push(p.light);
       W.props.push(p);
@@ -577,17 +652,22 @@ HC.world = (function () {
       if (L.flicker) r *= 0.9 + 0.1 * Math.sin(W.time * 11 + (L.x * 0.13 + L.y * 0.7)) + Math.random() * 0.04;
       if (lx < -r || lx > HC.VIEW_W + r || ly < -r || ly > HC.VIEW_H + r) continue;
       cutLight(lx, ly, r);
-      warmGlows.push([lx, ly, r, L.warm]);
+      warmGlows.push([lx, ly, r, L.violet ? 2 : (L.warm ? 1 : 0)]);
     }
     ctx.drawImage(lightCanvas, 0, 0);
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
+    var GLOW = [
+      'rgba(120,200,255,',  // 0 cold
+      'rgba(255,170,70,',   // 1 warm
+      'rgba(179,84,160,'    // 2 cursed violet
+    ];
     for (var j = 0; j < warmGlows.length; j++) {
       var wg = warmGlows[j];
       var grd = ctx.createRadialGradient(wg[0], wg[1], 1, wg[0], wg[1], wg[2] * 0.8);
-      var a = wg[3] ? 0.10 : 0.06;
-      grd.addColorStop(0, wg[3] ? 'rgba(255,170,70,' + a + ')' : 'rgba(120,200,255,' + a + ')');
+      var a = wg[3] === 1 ? 0.10 : wg[3] === 2 ? 0.12 : 0.06;
+      grd.addColorStop(0, GLOW[wg[3]] + a + ')');
       grd.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = grd;
       ctx.fillRect(wg[0] - wg[2], wg[1] - wg[2], wg[2] * 2, wg[2] * 2);

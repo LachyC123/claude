@@ -115,6 +115,28 @@ HC.script = {
   ],
   coleAfterQ1: [
     { who: 'BROTHER COLE', text: 'The glow reaches the tree line now. Others will come. And when they do... that cursed bell in the tower must be silenced. Soon.' }
+  ],
+
+  // ---------- Quest 2: The Bell Tower ----------
+  q2Start: [
+    { who: 'VELA', text: 'The chapel tower. Hear it? That toll under the wind - it never stops. It is what keeps the dead climbing out of their graves.' },
+    { who: 'VELA', text: 'Two ringers hold the belfry. The Bell-Ringer Twins. They were children of this parish once. Grief made them... this.' },
+    { who: 'VELA', text: 'Climb. Silence the bell. But be ready - the stair is theirs, and it is thick with the faithful.' }
+  ],
+  towerMid: [
+    { who: 'VELA', text: 'Halfway. The tolling is louder here - it gets into your teeth. Keep climbing. Do not listen to it too closely.' }
+  ],
+  twinsStart: [
+    { who: 'THE TWINS', text: 'RING with us. Ring until she wakes. Mother sleeps so deep, so deep...' },
+    { who: 'VELA', text: 'They will not stop for pity. End it, Gravebound. For them, and for everyone the bell has raised.' }
+  ],
+  twinsDead: [
+    { who: 'VELA', text: 'The bell is cracked through. Listen... nothing. The first silence Veyr has known in a year.' },
+    { who: 'VELA', text: 'They are only children again, in the end. Lay them down gently. Then go home - Candlefall has grown while you climbed.' }
+  ],
+  mapTableFirst: [
+    { who: 'BROTHER COLE', text: 'The others raised a war table while you were in the tower. With the bell silent, the roads are ours to walk again.' },
+    { who: 'VELA', text: 'Every marker is a wound in the kingdom. The Briarwood first, I think - its witches hate the Crown as much as we do. Choose when you are ready.' }
   ]
 };
 
@@ -124,7 +146,8 @@ HC.speakers = {
   'GRAVEKEEPER': { color: '#c04a50', sprite: function () { return HC.sprites.gravekeeper[0]; } },
   'BROTHER COLE': { color: '#9aa3b2', sprite: function () { return HC.sprites.survivor; } },
   'BRAM': { color: '#c9975a', sprite: function () { return HC.sprites.bram; } },
-  'LYSA': { color: '#8fce7a', sprite: function () { return HC.sprites.lysa; } }
+  'LYSA': { color: '#8fce7a', sprite: function () { return HC.sprites.lysa; } },
+  'THE TWINS': { color: '#b354a0', sprite: function () { return HC.sprites.twin[0]; } }
 };
 
 HC.dialogue = (function () {
