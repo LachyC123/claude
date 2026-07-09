@@ -64,7 +64,12 @@ HC.maps = (function () {
       { type: 'tomb', at: [[17, 23], [25, 24], [16, 27], [26, 28], [24, 32], [10, 33], [17, 36], [9, 38], [17, 40], [10, 42], [18, 44], [10, 47], [17, 48], [10, 52], [16, 53], [26, 54], [18, 57], [26, 57], [30, 25], [31, 39], [28, 46], [8, 26]] },
       { type: 'candles', at: [[9, 5], [34, 5], [9, 18], [34, 18], [19, 8], [12, 60], [31, 62], [18, 46], [23, 22], [11, 45]] },
       { type: 'skulls', at: [[13, 61], [30, 66], [24, 60], [15, 69], [27, 61]] },
-      { type: 'coffin', at: [[14, 62], [28, 64], [17, 66], [26, 68]] }
+      { type: 'coffin', at: [[14, 62], [28, 64], [17, 66], [26, 68]] },
+      { type: 'bones', at: [[16, 58], [29, 62], [12, 66], [25, 66], [8, 30], [37, 51]] },
+      { type: 'flowers', at: [[10, 24], [33, 27], [25, 43], [15, 37], [30, 33], [11, 52], [20, 63]] },
+      { type: 'puddle', at: [[19, 35], [24, 49], [14, 43], [28, 24]] },
+      { type: 'lanternpost', at: [[6, 34], [37, 43]] },
+      { type: 'rubble', at: [[9, 27], [31, 30], [13, 55]] }
     ],
     spawns: [
       { type: 'hollow', x: 13, y: 48, zone: 'z0' },
@@ -83,7 +88,10 @@ HC.maps = (function () {
       { type: 'sword', x: 22, y: 63 },
       { type: 'wisp', x: 4, y: 29 }, { type: 'wisp', x: 39, y: 36 },
       { type: 'wisp', x: 33, y: 17 }, { type: 'wisp', x: 35, y: 62 },
-      { type: 'ember', x: 36, y: 44 }, { type: 'ember', x: 24, y: 47 }
+      { type: 'ember', x: 36, y: 44 }, { type: 'ember', x: 24, y: 47 },
+      { type: 'crow', x: 18, y: 7 }, { type: 'crow', x: 30, y: 6 }, { type: 'crow', x: 6, y: 40 },
+      { type: 'rat', x: 22, y: 62 }, { type: 'rat', x: 12, y: 50 },
+      { type: 'moth', x: 9, y: 18 }, { type: 'moth', x: 34, y: 18 }
     ],
     gates: { A: { open: false }, B: { open: true }, D: { open: false } },
     triggers: [
@@ -128,13 +136,23 @@ HC.maps = (function () {
       { type: 'tree', at: [[3, 4], [30, 6], [4, 26], [29, 22], [2, 12], [31, 11], [7, 24], [29, 27]] },
       { type: 'tomb', at: [[9, 24], [24, 21], [27, 25]] },
       { type: 'skulls', at: [[8, 15]] },
-      { type: 'sign', at: [[13, 19]] }
+      { type: 'sign', at: [[13, 19]] },
+      { type: 'barrel', at: [[26, 11], [27, 12]] },
+      { type: 'crate', at: [[25, 12], [7, 10]] },
+      { type: 'sack', at: [[8, 11]] },
+      { type: 'flowers', at: [[11, 13], [21, 13], [10, 18], [22, 17], [9, 22]] },
+      { type: 'lanternpost', at: [[11, 16], [22, 16]] },
+      { type: 'hanglantern', at: [[13, 6], [19, 6]] },
+      { type: 'puddle', at: [[16, 20], [12, 24]] }
     ],
     spawns: [
       { type: 'brazier', x: 16, y: 11 },
       { type: 'shrine', x: 23, y: 9 },
       { type: 'survivor', x: 13, y: 8 },
-      { type: 'towerdoor', x: 16, y: 7 }
+      { type: 'towerdoor', x: 16, y: 7 },
+      { type: 'crow', x: 28, y: 5 }, { type: 'crow', x: 5, y: 6 },
+      { type: 'rat', x: 26, y: 24 },
+      { type: 'moth', x: 11, y: 16 }, { type: 'moth', x: 22, y: 16 }, { type: 'moth', x: 16, y: 11 }
     ],
     gates: {},
     triggers: [
@@ -182,7 +200,13 @@ HC.maps = (function () {
       { type: 'sign', at: [[42, 15]] },
       { type: 'tree', at: [[2, 6], [43, 8], [2, 29], [43, 29], [28, 31], [17, 31]] },
       { type: 'candles', at: [[5, 14], [32, 27]] },
-      { type: 'skulls', at: [[26, 18]] }
+      { type: 'skulls', at: [[26, 18]] },
+      { type: 'rubble', at: [[18, 5], [12, 22], [29, 8], [36, 24], [9, 27], [24, 14]] },
+      { type: 'barrel', at: [[15, 19], [34, 15]] },
+      { type: 'crate', at: [[13, 17], [36, 13]] },
+      { type: 'sack', at: [[22, 24], [7, 20]] },
+      { type: 'bones', at: [[27, 6], [10, 12], [39, 26]] },
+      { type: 'puddle', at: [[20, 17], [30, 22], [11, 9]] }
     ],
     spawns: [
       { type: 'hollow', x: 33, y: 11, zone: 'v' },
@@ -195,7 +219,9 @@ HC.maps = (function () {
       { type: 'bramDoor', x: 6, y: 16 },
       { type: 'lysaDoor', x: 33, y: 27 },
       { type: 'wisp', x: 4, y: 8 }, { type: 'wisp', x: 41, y: 27 },
-      { type: 'ember', x: 24, y: 19 }
+      { type: 'ember', x: 24, y: 19 },
+      { type: 'crow', x: 19, y: 3 }, { type: 'crow', x: 31, y: 23 }, { type: 'crow', x: 8, y: 4 },
+      { type: 'rat', x: 15, y: 19 }, { type: 'rat', x: 34, y: 15 }, { type: 'rat', x: 24, y: 27 }
     ],
     gates: {},
     triggers: [
@@ -245,7 +271,11 @@ HC.maps = (function () {
       { type: 'hangbell', at: [[4, 6], [19, 8], [5, 31], [18, 30]] },
       { type: 'bellrope', at: [[7, 5], [16, 5], [9, 29], [14, 29]] },
       { type: 'skulls', at: [[10, 53], [14, 36]] },
-      { type: 'tomb', at: [[4, 55], [19, 56]] }
+      { type: 'tomb', at: [[4, 55], [19, 56]] },
+      { type: 'rubble', at: [[4, 27], [19, 27], [5, 48], [18, 48], [10, 38]] },
+      { type: 'bones', at: [[16, 51], [6, 54], [12, 34]] },
+      { type: 'mushrooms', at: [[4, 33], [19, 31], [7, 50], [17, 53]] },
+      { type: 'sack', at: [[5, 52], [18, 52]] }
     ],
     spawns: [
       { type: 'greatbell', x: 12, y: 6 },
@@ -259,7 +289,9 @@ HC.maps = (function () {
       { type: 'hollow', x: 10, y: 50, zone: 'low' },
       { type: 'ember', x: 12, y: 27 },
       { type: 'ember', x: 12, y: 48 },
-      { type: 'wisp', x: 4, y: 13 }, { type: 'wisp', x: 19, y: 13 }
+      { type: 'wisp', x: 4, y: 13 }, { type: 'wisp', x: 19, y: 13 },
+      { type: 'rat', x: 12, y: 50 }, { type: 'rat', x: 8, y: 36 },
+      { type: 'moth', x: 3, y: 12 }, { type: 'moth', x: 20, y: 12 }, { type: 'moth', x: 4, y: 33 }
     ],
     gates: { B: { open: true } },
     triggers: [
@@ -417,6 +449,33 @@ HC.world = (function () {
         p.img = S.bellRope;
         p.ox = 6; p.oy = -22;
         p.base = 0;
+      } else if (type === 'barrel') {
+        p.img = S.barrel; p.ox = 2; p.oy = 1; p.base = p.y + 16;
+        p.solid = { x: p.x + 2, y: p.y + 6, w: 8, h: 9 };
+      } else if (type === 'crate') {
+        p.img = S.crate; p.ox = 1; p.oy = 4; p.base = p.y + 16;
+        p.solid = { x: p.x + 2, y: p.y + 7, w: 9, h: 8 };
+      } else if (type === 'sack') {
+        p.img = S.sack; p.ox = 2; p.oy = 3; p.base = p.y + 16;
+        p.solid = { x: p.x + 3, y: p.y + 8, w: 6, h: 7 };
+      } else if (type === 'lanternpost') {
+        p.img = S.lanternPost; p.ox = 3; p.oy = -10; p.base = p.y + 16;
+        p.solid = { x: p.x + 4, y: p.y + 8, w: 3, h: 8 };
+        p.light = { x: p.x + 8, y: p.y - 4, r: 44, warm: 1, flicker: 1 };
+      } else if (type === 'hanglantern') {
+        p.img = S.hangLantern; p.ox = 4; p.oy = -14; p.base = p.y + 2;
+        p.light = { x: p.x + 8, y: p.y - 6, r: 34, warm: 1, flicker: 1 };
+      } else if (type === 'flowers') {
+        p.img = S.flowers(hash2(tx, ty)); p.ox = 2; p.oy = 8; p.base = 0;
+      } else if (type === 'bones') {
+        p.img = S.bonePile(hash2(tx, ty)); p.ox = 1; p.oy = 7; p.base = 0;
+      } else if (type === 'puddle') {
+        p.img = S.puddle(hash2(tx, ty)); p.ox = -1; p.oy = 8; p.base = 0;
+      } else if (type === 'mushrooms') {
+        p.img = S.mushrooms(hash2(tx, ty)); p.ox = 2; p.oy = 8; p.base = 0;
+        p.light = { x: p.x + 8, y: p.y + 12, r: 16, warm: 0, flicker: 1 };
+      } else if (type === 'rubble') {
+        p.img = S.rubble(hash2(tx, ty)); p.ox = 1; p.oy = 8; p.base = 0;
       }
       if (p.light) W.lights.push(p.light);
       W.props.push(p);

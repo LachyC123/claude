@@ -32,7 +32,10 @@ This implements **Milestones 0–10** of the plan's build roadmap (§16), coveri
   hit-stop, screen shake, damage numbers (Milestone 0)
 - **Pixel visual direction** — deep navy / charcoal palette, warm lantern light against cold blue
   fog, rain with landing splashes, drifting ash motes caught in the light, dynamic 2D lighting
-  with flicker, soft grounding shadows, readable chunky silhouettes (Milestone 1, §3)
+  with flicker (warm / cold / cursed-violet channels), soft grounding shadows, readable chunky
+  silhouettes, and a lived-in world: lantern posts, barrels, crates, flowers, bone piles, puddles,
+  glowing mushrooms, plus ambient critters — crows that startle and take flight, scurrying rats,
+  moths that circle the lamps (Milestone 1, §3)
 - **Candlefall Chapel hub, Stage 0 → 1 → 2** — ruined chapel, dying NPC (Brother Cole), brazier
   rest point; lighting the flame, then feeding it holy oil, visibly brightens the hub in stages;
   rescued villagers appear as camp NPCs with their own tents/tables (Milestones 2 & 7, §7)

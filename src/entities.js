@@ -694,10 +694,14 @@ HC.makeBellTwins = function (tx, ty) {
         }
       }
 
+      // cursed presence: faint violet motes rise from them
+      if (Math.random() < dt * (T.enraged ? 9 : 4))
+        HC.particles.spawn({ x: T.x + HC.rand(-6, 6), y: T.y - HC.rand(0, 16), vx: HC.rand(-4, 4), vy: HC.rand(-14, -3), life: 0.7, color: T.enraged ? '#c83c96' : '#8a4696', size: 1, glow: 1 });
+
       switch (T.state) {
         case 'intro':
           T.t += dt;
-          if (T.t > 0.8 + T.id * 0.3) { T.state = 'walk'; T.t = 0; }
+          if (T.t > 1.2 + T.id * 0.25) { T.state = 'walk'; T.t = 0; }
           break;
         case 'walk': {
           if (p.dead) break;
@@ -744,38 +748,79 @@ HC.makeBellTwins = function (tx, ty) {
     T.base = function () { return T.y + 10; };
     T.draw = function (ctx, cx, cy) {
       var ringing = T.state === 'windupRing';
-      var img = ringing ? (T.faceLeft ? HC.sprites.twinRingLeft : HC.sprites.twinRing)
-                        : (T.faceLeft ? HC.sprites.twinLeft[0] : HC.sprites.twin[0]);
+      var raised = ringing || T.state === 'intro';
+      var winding = ringing || T.state === 'windupSwing' || T.state === 'intro';
+      var img = raised ? (T.faceLeft ? HC.sprites.twinRingLeft : HC.sprites.twinRing)
+                       : (T.faceLeft ? HC.sprites.twinLeft[0] : HC.sprites.twin[0]);
+      var scx = Math.round(T.x - cx), bcy = Math.round(T.y - cy);
       var px = Math.round(T.x - cx - img.width / 2), py = Math.round(T.y - cy - img.height + 10);
-      ctx.fillStyle = 'rgba(5,7,15,0.45)';
-      ctx.fillRect(px + 4, Math.round(T.y - cy + 3), img.width - 8, 3);
+
+      // menacing ground aura (cursed violet pool that darkens when enraged)
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      var auraR = (T.enraged ? 20 : 15) + Math.sin(T.anim * 3 + T.id) * 2;
+      var ag = ctx.createRadialGradient(scx, bcy + 2, 1, scx, bcy + 2, auraR);
+      ag.addColorStop(0, T.enraged ? 'rgba(200,60,150,0.28)' : 'rgba(140,70,150,0.18)');
+      ag.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ag;
+      ctx.fillRect(scx - auraR, bcy + 2 - auraR, auraR * 2, auraR * 2);
+      ctx.restore();
+
+      ctx.fillStyle = 'rgba(5,7,15,0.5)';
+      ctx.fillRect(px + 4, bcy + 3, img.width - 8, 3);
       ctx.drawImage(img, px, py);
-      // enrage / windup tint
-      if (T.flash > 0 || ringing || T.enraged) {
-        var a = ringing ? 0.3 + 0.25 * Math.sin(T.anim * 26) : T.flash > 0 ? T.flash * 6 : 0.18 + 0.1 * Math.sin(T.anim * 8);
+
+      // enrage / windup silhouette tint
+      if (T.flash > 0 || winding || T.enraged) {
+        var a = winding ? 0.3 + 0.25 * Math.sin(T.anim * 26) : T.flash > 0 ? T.flash * 6 : 0.16 + 0.1 * Math.sin(T.anim * 8);
         ctx.globalAlpha = a;
         ctx.globalCompositeOperation = 'lighter';
-        // recolor via tinted rect over sprite silhouette
         ctx.drawImage(img, px, py);
-        if (T.enraged) { ctx.fillStyle = 'rgba(179,84,160,0.5)'; ctx.fillRect(px + 3, py + 2, img.width - 6, 10); }
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
       }
+
+      // glowing violet eyes — brighter while winding up or enraged
+      var eyeGlow = (winding ? 1 : T.enraged ? 0.85 : 0.6) * (0.75 + 0.25 * Math.sin(T.anim * (winding ? 20 : 6)));
+      var eyes = HC.sprites.twinEyes;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (var e = 0; e < eyes.length; e++) {
+        var ex = T.faceLeft ? (img.width - eyes[e][0]) : eyes[e][0];
+        var exx = px + ex, eyy = py + eyes[e][1];
+        ctx.fillStyle = 'rgba(210,140,255,' + eyeGlow + ')';
+        ctx.fillRect(exx - 1, eyy, 1, 1);
+        ctx.fillStyle = 'rgba(150,70,190,' + (eyeGlow * 0.5) + ')';
+        ctx.fillRect(exx - 2, eyy - 1, 3, 3);
+      }
+      ctx.restore();
+
+      // ring telegraph: a violet warning circle blooms before the shockwave lands
+      if (ringing) {
+        var wt = T.t / (T.enraged ? 0.6 : 0.8);
+        var wr = 10 + wt * (T.enraged ? 60 : 48);
+        ctx.strokeStyle = 'rgba(179,84,160,' + (0.15 + 0.35 * wt) + ')';
+        ctx.lineWidth = 1 + wt * 2;
+        ctx.beginPath();
+        ctx.arc(scx, bcy - 4, wr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       if (T.state === 'swing') {
         ctx.save();
-        ctx.translate(Math.round(T.x - cx), Math.round(T.y - cy - 6));
+        ctx.translate(scx, bcy - 6);
         ctx.rotate(T.swingAng);
         var tt = Math.min(1, T.t / 0.26);
         ctx.strokeStyle = 'rgba(224,192,106,' + (0.8 - tt * 0.6) + ')';
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(0, 0, 22, -1.0 + 2.0 * tt * 0.5, -1.0 + 2.0 * (0.4 + tt * 0.6));
+        ctx.arc(0, 0, 24, -1.0 + 2.0 * tt * 0.5, -1.0 + 2.0 * (0.4 + tt * 0.6));
         ctx.stroke();
         ctx.restore();
       }
     };
     T.lights = function () {
-      return [{ x: T.x, y: T.y - 6, r: T.enraged ? 26 : 18, warm: !T.enraged, violet: T.enraged, flicker: 1 }];
+      return [{ x: T.x, y: T.y - 8, r: T.enraged ? 30 : 22, violet: true, flicker: 1 }];
     };
     return T;
   }
@@ -793,8 +838,15 @@ HC.makeBellTwins = function (tx, ty) {
   ctrl.activate = function () {
     if (ctrl.state !== 'dormant') return;
     ctrl.state = 'active';
+    // dramatic entrance: both toll their bells, a violet pulse floods the belfry
+    HC.audio.sfx.bell();
     HC.audio.sfx.roar();
-    for (var i = 0; i < ctrl.twins.length; i++) { ctrl.twins[i].state = 'intro'; ctrl.twins[i].t = 0; }
+    HC.camera.shake(4, 0.7);
+    for (var i = 0; i < ctrl.twins.length; i++) {
+      var t = ctrl.twins[i];
+      t.state = 'intro'; t.t = 0;
+      HC.particles.burst(t.x, t.y - 8, 30, { color: '#b354a0', spMin: 20, spMax: 120, lifeMax: 1.1, glow: 1 });
+    }
   };
   ctrl.onTwinDown = function (dead) {
     var other = ctrl.twins[1 - dead.id];
@@ -995,6 +1047,100 @@ HC.makePickup = function (type, tx, ty) {
   P.lights = function () { return [{ x: P.x, y: P.y, r: 16, warm: type === 'ember' ? 1 : 0, flicker: 1 }]; };
   return P;
 };
+
+// Ambient critters — pure atmosphere, no collision. crow (perches, flees), rat (scurries),
+// moth (flutters around its home light).
+HC.makeCritter = function (type, tx, ty) {
+  var C = {
+    kind: 'critter', ctype: type, alive: true,
+    hx: tx * HC.TILE + 8, hy: ty * HC.TILE + 8,
+    x: tx * HC.TILE + 8, y: ty * HC.TILE + 8,
+    t: HC.rand(0, 6), state: 'idle', vx: 0, vy: 0, faceLeft: Math.random() < 0.5,
+    bob: 0, cd: HC.rand(1, 4)
+  };
+  C.update = function (dt) {
+    C.t += dt;
+    var p = HC.game.player;
+    var d = p ? HC.dist(C.x, C.y, p.x, p.y) : 999;
+    if (type === 'crow') {
+      if (C.state === 'idle') {
+        C.cd -= dt;
+        if (d < 44 && !p.dead) { // startled: take flight
+          C.state = 'fly'; C.t = 0;
+          var a = HC.angTo(p.x, p.y, C.x, C.y) + HC.rand(-0.5, 0.5);
+          C.vx = Math.cos(a) * 60; C.vy = -HC.rand(30, 55);
+          C.faceLeft = C.vx < 0;
+          if (Math.random() < 0.5 && HC.audio.sfx.crow) HC.audio.sfx.crow();
+        } else if (C.cd <= 0) { C.cd = HC.rand(2, 5); C.pecking = !C.pecking; }
+      } else { // flying off
+        C.x += C.vx * dt; C.y += C.vy * dt;
+        C.vy += 12 * dt;
+        C.t += dt;
+        if (C.t > 2.2) { // land somewhere near home
+          var nx = C.hx + HC.rand(-30, 30), ny = C.hy + HC.rand(-24, 24);
+          if (HC.world.circleFree(nx, ny, 4)) { C.x = nx; C.y = ny; }
+          else { C.x = C.hx; C.y = C.hy; }
+          C.state = 'idle'; C.pecking = false; C.cd = HC.rand(1, 3);
+        }
+      }
+    } else if (type === 'rat') {
+      if (d < 40 && !p.dead) { // flee along ground
+        var fa = HC.angTo(p.x, p.y, C.x, C.y);
+        C.vx = Math.cos(fa) * 55; C.vy = Math.sin(fa) * 55;
+      } else {
+        C.cd -= dt;
+        if (C.cd <= 0) {
+          C.cd = HC.rand(1.5, 4);
+          var wa = HC.rand(0, Math.PI * 2);
+          C.vx = Math.cos(wa) * 26; C.vy = Math.sin(wa) * 26;
+        }
+        C.vx *= Math.pow(0.02, dt); C.vy *= Math.pow(0.02, dt);
+      }
+      var mvx = C.vx * dt, mvy = C.vy * dt;
+      if (HC.world.circleFree(C.x + mvx, C.y + mvy, 3)) { C.x += mvx; C.y += mvy; }
+      else { C.vx *= -0.5; C.vy *= -0.5; }
+      if (Math.abs(C.vx) > 1) C.faceLeft = C.vx < 0;
+      // keep near home
+      if (HC.dist(C.x, C.y, C.hx, C.hy) > 60) { var ha = HC.angTo(C.x, C.y, C.hx, C.hy); C.vx += Math.cos(ha) * 20; C.vy += Math.sin(ha) * 20; }
+    } else if (type === 'moth') {
+      // flutter around home
+      var ang = C.t * 1.5 + Math.sin(C.t * 3) * 1.2;
+      var rad = 8 + Math.sin(C.t * 0.8) * 5;
+      C.x = C.hx + Math.cos(ang) * rad + HC.rand(-1, 1);
+      C.y = C.hy + Math.sin(ang) * rad * 0.7 + HC.rand(-1, 1);
+    }
+  };
+  C.base = function () { return C.y + (type === 'moth' ? 300 : 4); };
+  C.draw = function (ctx, cx, cy) {
+    var px = Math.round(C.x - cx), py = Math.round(C.y - cy);
+    var frames = HC.sprites[type];
+    var img, f = 0;
+    if (type === 'crow') {
+      if (C.state === 'fly') f = Math.floor(C.t * 12) % 2;
+      else f = 0;
+      img = frames[f];
+      // shadow when perched
+      if (C.state === 'idle') { ctx.fillStyle = 'rgba(5,7,15,0.35)'; ctx.fillRect(px - 3, py + 4, 6, 2); }
+      var bob = (C.state === 'idle' && C.pecking) ? (Math.floor(C.t * 6) % 2) : 0;
+      drawFlip(ctx, img, px - 4, py - 6 + bob, C.faceLeft);
+    } else if (type === 'rat') {
+      f = Math.abs(C.vx) + Math.abs(C.vy) > 4 ? Math.floor(C.t * 12) % 2 : 0;
+      img = frames[f];
+      drawFlip(ctx, img, px - 5, py - 4, C.faceLeft);
+    } else {
+      img = frames[Math.floor(C.t * 10) % 2];
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(img, px - 2, py - 2);
+      ctx.globalAlpha = 1;
+    }
+  };
+  C.lights = function () { return type === 'moth' ? [] : []; };
+  return C;
+};
+function drawFlip(ctx, img, x, y, flip) {
+  if (flip) { ctx.save(); ctx.translate(x + img.width, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore(); }
+  else ctx.drawImage(img, x, y);
+}
 
 HC.makeInteractable = function (type, tx, ty) {
   var I = {

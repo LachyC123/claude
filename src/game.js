@@ -140,6 +140,8 @@ HC.game = (function () {
         var e = HC.makeEnemy(s.type, s.x * HC.TILE + 8, s.y * HC.TILE + 8, s.zone);
         e.rising = 0;
         G.ents.push(e);
+      } else if (s.type === 'crow' || s.type === 'rat' || s.type === 'moth') {
+        G.ents.push(HC.makeCritter(s.type, s.x, s.y));
       } else if (s.type === 'wisp' || s.type === 'ember') {
         G.ents.push(HC.makePickup(s.type, s.x, s.y));
       } else if (s.type === 'sword') {

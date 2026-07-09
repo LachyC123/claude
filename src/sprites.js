@@ -342,46 +342,50 @@ HC.sprites = (function () {
     ]))
   ];
 
-  // ---------- Bell-Ringer Twin (16x22): hooded ringer with a cracked mask and a handbell ----------
+  // ---------- Bell-Ringer Twin (18x27): a tall hooded ringer, pale cracked mask,
+  // two glowing violet eyes, tattered robe, heavy handbell. Bigger than the player on purpose. ----------
   function twinMap(armUp) {
     var head = [
-      '.....00000......',
-      '....0CCCCC0.....',
-      '...0CCcccCC0....',
-      '...0CcWWWcC0....',   // pale cracked mask
-      '...0CWWpWWC0....',   // cursed-violet eye slit
-      '...0CWWWWWC0....',
-      '...0CcWWWcC0....',
-      '....0CWWWC0.....',   // chin
-      '....00CCC00.....'
+      '........00........',
+      '.......0PP0.......',   // violet-lined hood tip
+      '......0CPPC0......',
+      '.....0CCllCC0.....',
+      '....0CCllllCC0....',
+      '....0CKKKKKKC0....',   // hood shadow
+      '....0CKWWWWKC0....',   // pale mask top
+      '....0CKWpWpWKC0...',   // two violet eyes
+      '....0CKWpWpWKC0...',
+      '....0CKWwwwWKC0...',   // cracked cheek
+      '.....0KWWWWK0.....',   // chin
+      '.....00CCCC00.....'
     ];
     var bodyDown = [
-      '...0CCCCCCC0....',
-      '..0CCClllCCC0...',
-      '..0CCllllllCC0..',
-      '..0CCllllllCC0.z',   // right hand reaches to the bell chain
-      '..0CClllll0Zznn0',
-      '..0CCClll0Zznnz0',   // bronze bell hanging low
-      '..0CCCCC00zznnZ0',
-      '..0CCCCCC0.ZZZ0.',   // bell mouth
-      '...0CCCCC0..0...'
+      '....0CCCCCCCC0....',
+      '...0CClllllCC0....',
+      '..0CClllllllCC0...',
+      '..0CClllllll0Zz0..',   // arm out to the bell chain
+      '..0CCCllll0ZnnnZ0.',
+      '..0CCCClll0znnnz0.',   // heavy bronze bell
+      '..0CCCCCCC0ZnnnZ0.',
+      '..0CCCCCCC0zZZZz0.',   // bell mouth
+      '..0CCCCCCCC00.00..'
     ];
     var bodyUp = [
-      '..zCCCCCCC0.....',   // bell raised high, arm up
-      'Znn0CClllCCC0...',
-      'znnzCllllllCC0..',
-      'zznnClllll lCC0.'.replace(' ', 'l'),
-      'ZzzZClllllllCC0.',
-      '.ZZ0CCClllllC0..',
-      '...0CCCCCCCCC0..',
-      '...0CCCCCCCC0...',
-      '....0CCCCC0.....'
+      '..zZ0CCCCCCCC0....',   // bell hoisted high
+      'ZnnnZCClllllCC0...',
+      'znnnzClllllllCC0..',
+      'ZnnnZClllllllCC0..',
+      'zZZZzCCCllll CC0..'.replace(' ', 'l'),
+      '..00.CCCCllllC0...',
+      '.....0CCCCCCCC0...',
+      '.....0CCCCCCC0....',
+      '.....0CCCCCCC0....'
     ];
     var legs = [
-      '...0CC0.0CC0....',
-      '...0CC0.0CC0....',
-      '...0ss0.0ss0....',
-      '....00...00.....'
+      '....0CCC00CCC0....',
+      '....0CC0..0CC0....',   // tattered robe hem
+      '....0sC0..0Cs0....',
+      '.....00....00.....'
     ];
     return head.concat(armUp ? bodyUp : bodyDown).concat(legs);
   }
@@ -389,6 +393,8 @@ HC.sprites = (function () {
   S.twinRing = fromMap(twinMap(true));
   S.twinLeft = [flipX(S.twin[0]), flipX(S.twin[1])];
   S.twinRingLeft = flipX(S.twinRing);
+  // eye-glow overlay positions (sprite-local px) for the pulsing violet stare
+  S.twinEyes = [[8, 7], [10, 7], [8, 8], [10, 8]];
 
   // ---------- The Great Cursed Bell (30x34): bronze, cracked, violet glow within ----------
   S.greatBell = function (glow) {
@@ -970,6 +976,180 @@ HC.sprites = (function () {
     g.fillStyle = PAL.G; g.fillRect(4, 4, 2, 1); g.fillRect(11, 4, 2, 1);
     g.fillStyle = PAL.W; g.fillRect(12, 3, 2, 2);
   });
+
+  // ---------- extra decor props (world detailing) ----------
+  S.barrel = make(12, 15, function (g) {
+    var P = PAL;
+    g.fillStyle = P['0']; g.fillRect(1, 1, 10, 13);
+    g.fillStyle = P.B; g.fillRect(2, 2, 8, 11);
+    g.fillStyle = P.b; g.fillRect(2, 2, 2, 11); g.fillRect(3, 2, 6, 1);
+    g.fillStyle = P.D; g.fillRect(8, 3, 1, 10);
+    g.fillStyle = P.s; g.fillRect(1, 4, 10, 1); g.fillRect(1, 10, 10, 1);
+    g.fillStyle = P.S; g.fillRect(1, 4, 10, 1);
+    g.fillStyle = P['0']; g.fillRect(3, 1, 6, 1);
+  });
+
+  S.crate = make(13, 12, function (g) {
+    var P = PAL;
+    g.fillStyle = P['0']; g.fillRect(1, 2, 11, 10);
+    g.fillStyle = P.B; g.fillRect(2, 3, 9, 8);
+    g.fillStyle = P.b; g.fillRect(2, 3, 9, 1); g.fillRect(2, 3, 1, 8);
+    g.fillStyle = P.D;
+    g.fillRect(2, 3, 9, 1); g.fillRect(2, 10, 9, 1);
+    g.fillRect(2, 3, 1, 8); g.fillRect(10, 3, 1, 8);
+    // diagonal brace
+    for (var i = 0; i < 8; i++) g.fillRect(2 + i, 10 - i, 1, 1);
+  });
+
+  S.sack = make(11, 13, function (g) {
+    var P = PAL;
+    g.fillStyle = P['0']; g.fillRect(2, 3, 7, 10);
+    g.fillStyle = P.w; g.fillRect(3, 4, 5, 8);
+    g.fillStyle = P.W; g.fillRect(3, 4, 2, 7);
+    g.fillStyle = P['0']; g.fillRect(3, 1, 5, 3);
+    g.fillStyle = P.w; g.fillRect(4, 2, 1, 2); g.fillRect(6, 2, 1, 2);
+    g.fillStyle = P.B; g.fillRect(4, 8, 3, 1);
+  });
+
+  S.lanternPost = make(10, 26, function (g) {
+    var P = PAL;
+    // post
+    g.fillStyle = P['0']; g.fillRect(4, 6, 3, 20);
+    g.fillStyle = P.s; g.fillRect(5, 7, 1, 18);
+    g.fillStyle = P.m; g.fillRect(3, 24, 5, 2);
+    // arm + lantern housing
+    g.fillStyle = P['0']; g.fillRect(2, 4, 6, 5); g.fillRect(1, 3, 8, 1);
+    g.fillStyle = P.O; g.fillRect(3, 5, 4, 3);
+    g.fillStyle = P.o; g.fillRect(4, 5, 2, 3);
+    g.fillStyle = P.y; g.fillRect(4, 6, 2, 1);
+    g.fillStyle = P['0']; g.fillRect(4, 2, 2, 1);
+  });
+
+  S.hangLantern = make(8, 16, function (g) {
+    var P = PAL;
+    g.fillStyle = P.B; g.fillRect(3, 0, 1, 5);
+    g.fillStyle = P['0']; g.fillRect(2, 5, 5, 7);
+    g.fillStyle = P.O; g.fillRect(3, 6, 3, 5);
+    g.fillStyle = P.o; g.fillRect(3, 7, 2, 3);
+    g.fillStyle = P.y; g.fillRect(4, 8, 1, 2);
+    g.fillStyle = P.s; g.fillRect(2, 5, 5, 1); g.fillRect(2, 11, 5, 1);
+  });
+
+  S.flowers = function (seed) {
+    var rng = HC.srng((seed || 3) * 131 + 7);
+    return make(12, 8, function (g) {
+      var cols = [PAL.W, '#b0b6d8', '#c99bce', PAL.o];
+      for (var i = 0; i < 4; i++) {
+        var x = 1 + Math.floor(rng() * 10), y = 2 + Math.floor(rng() * 5);
+        g.fillStyle = PAL.G; g.fillRect(x, y, 1, 8 - y);
+        g.fillStyle = cols[Math.floor(rng() * cols.length)];
+        g.fillRect(x, y - 1, 1, 1); g.fillRect(x - 1, y, 1, 1); g.fillRect(x + 1, y, 1, 1);
+      }
+    });
+  };
+
+  S.bonePile = function (seed) {
+    var rng = HC.srng((seed || 5) * 211 + 3);
+    return make(14, 9, function (g) {
+      g.fillStyle = PAL['0']; g.fillRect(1, 4, 12, 4);
+      g.fillStyle = PAL.w; g.fillRect(2, 5, 10, 2);
+      for (var i = 0; i < 6; i++) {
+        g.fillStyle = i % 2 ? PAL.W : PAL.w;
+        var x = 1 + Math.floor(rng() * 11), y = 2 + Math.floor(rng() * 5);
+        if (rng() < 0.5) g.fillRect(x, y, 3, 1); else g.fillRect(x, y, 1, 3);
+      }
+      // a little skull
+      g.fillStyle = PAL.W; g.fillRect(9, 3, 3, 3);
+      g.fillStyle = PAL.K; g.fillRect(9, 4, 1, 1); g.fillRect(11, 4, 1, 1);
+    });
+  };
+
+  S.puddle = function (seed) {
+    var rng = HC.srng((seed || 8) * 97 + 11);
+    return make(18, 9, function (g) {
+      g.fillStyle = 'rgba(40,60,90,0.55)';
+      for (var y = 0; y < 9; y++) {
+        var w = Math.round(Math.sin((y / 9) * Math.PI) * 8) + 2;
+        g.fillRect(9 - w, y, w * 2, 1);
+      }
+      g.fillStyle = 'rgba(120,150,200,0.35)';
+      g.fillRect(5, 2, 5, 1); g.fillRect(8, 5, 4, 1);
+    });
+  };
+
+  S.mushrooms = function (seed) {
+    var rng = HC.srng((seed || 2) * 71 + 5);
+    return make(12, 8, function (g) {
+      for (var i = 0; i < 3; i++) {
+        var x = 1 + i * 4 + Math.floor(rng() * 2), h = 2 + Math.floor(rng() * 3);
+        g.fillStyle = PAL.w; g.fillRect(x + 1, 7 - h, 1, h);
+        g.fillStyle = '#5fa8c8'; g.fillRect(x, 6 - h, 3, 2);
+        g.fillStyle = '#8fe8ff'; g.fillRect(x + 1, 6 - h, 1, 1);
+      }
+    });
+  };
+
+  S.rubble = function (seed) {
+    var rng = HC.srng((seed || 4) * 53 + 9);
+    return make(14, 8, function (g) {
+      for (var i = 0; i < 8; i++) {
+        g.fillStyle = i % 2 ? PAL.M : PAL.m;
+        var x = Math.floor(rng() * 12), y = 2 + Math.floor(rng() * 5), s = 2 + Math.floor(rng() * 2);
+        g.fillStyle = PAL['0']; g.fillRect(x, y, s + 1, s + 1);
+        g.fillStyle = i % 2 ? PAL.M : PAL.H; g.fillRect(x, y, s, s);
+      }
+    });
+  };
+
+  // ---------- ambient critter sprites ----------
+  S.crow = [
+    fromMap([  // perched
+      '.........',
+      '..0......',
+      '.0K0.....',
+      '0KKK00...',
+      '0KKKKK0..',
+      '.0KKKK0y0',
+      '..0KK0...',
+      '..0K0....',
+      '..0.0....'
+    ], { '0': '#0d0f1e', 'K': '#1b1e2b', 'y': '#f2a13c' }),
+    fromMap([  // wings up (flap)
+      '.0.....0.',
+      '0K0...0K0',
+      '0KK0.0KK0',
+      '.0KK0KK0.',
+      '..0KKK0y0',
+      '..0KKK0..',
+      '...0K0...',
+      '...0.0...',
+      '.........'
+    ], { '0': '#0d0f1e', 'K': '#1b1e2b', 'y': '#f2a13c' })
+  ];
+  S.rat = [
+    fromMap([
+      '..........',
+      '.......0..',
+      '0000..0K0.',
+      '0KKK000KK0',
+      '0KKKKKKKK0',
+      '.0KKKKKK0.',
+      '..0.00.0..'
+    ], { '0': '#0d0f1e', 'K': '#3a3f4d' }),
+    fromMap([
+      '..........',
+      '.......0..',
+      '0000..0K0.',
+      '0KKK000KK0',
+      '0KKKKKKKK0',
+      '.0KKKKKK0.',
+      '..00..00..'
+    ], { '0': '#0d0f1e', 'K': '#3a3f4d' })
+  ];
+  S.moth = [
+    fromMap(['.0.0.', '0W0W0', '0WWW0', '.0W0.', '..0..'], { '0': '#3a3242', 'W': '#c9c0d8' }),
+    fromMap(['0...0', '0W0W0', '0WWW0', '.0W0.', '..0..'], { '0': '#3a3242', 'W': '#c9c0d8' })
+  ];
 
   // ---------- tiles ----------
   function tile(fn, seed) {

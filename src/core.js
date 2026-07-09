@@ -401,7 +401,12 @@ HC.audio = (function () {
       tone('sine', 220, 1.2, 0.15, { slide: 440, echo: true });
       tone('sine', 330, 1.6, 0.1, { at: 0.3, slide: 660, echo: true });
     },
-    rise: function () { noise(0.5, 0.2, { type: 'lowpass', freq: 500, fslide: 120 }); tone('sawtooth', 100, 0.4, 0.1, { slide: 60 }); }
+    rise: function () { noise(0.5, 0.2, { type: 'lowpass', freq: 500, fslide: 120 }); tone('sawtooth', 100, 0.4, 0.1, { slide: 60 }); },
+    crow: function () {
+      tone('sawtooth', 620, 0.1, 0.05, { slide: 380, echo: true });
+      tone('sawtooth', 540, 0.12, 0.05, { at: 0.13, slide: 340, echo: true });
+      noise(0.08, 0.04, { freq: 1800, q: 3 });
+    }
   };
 
   // music: sparse dark ambient / boss pulse, scheduled per beat
